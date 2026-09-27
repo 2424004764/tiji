@@ -1,0 +1,9 @@
+{
+  "name": "tiji",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "check": "pnpm -r run check",
+    "test": "pnpm -r run test"
+  }
+}
