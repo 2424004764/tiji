@@ -3,10 +3,8 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-09-14',
   css: ['~/assets/css/main.css'],
   devtools: { enabled: false },
-  runtimeConfig: { public: { apiBase: 'https://tiji-api.2424004764.workers.dev/api/v1' } },
-  $development: {
-    runtimeConfig: { public: { apiBase: 'http://localhost:8799/api/v1' } }
-  },
+  // apiBase 的值按环境来自 .env.development / .env.production
+  runtimeConfig: { public: { apiBase: '' } },
   // 题库详情页 /banks/[id]：题目管理与分类标签
   app: {
     head: {

@@ -2,3 +2,7 @@ name = "tiji"
 pages_build_output_dir = "dist"
 compatibility_date = "2026-09-14"
 compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# 线上 SSR 运行时使用的 API 地址（与 .env.production 保持一致）
+NUXT_PUBLIC_API_BASE = "https://tiji-api.2424004764.workers.dev/api/v1"
