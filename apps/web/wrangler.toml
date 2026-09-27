@@ -2,6 +2,3 @@ name = "tiji"
 pages_build_output_dir = "dist"
 compatibility_date = "2026-09-14"
 compatibility_flags = ["nodejs_compat"]
-
-[vars]
-NUXT_PUBLIC_API_BASE = "https://tiji-api.2424004764.workers.dev/api/v1"
