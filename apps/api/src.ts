@@ -8,7 +8,8 @@ type QuestionInput = { type: 'single_choice' | 'true_false' | 'multiple_choice';
 
 const app = new Hono<Env>().basePath('/api/v1')
 const isLocalOrigin = (origin: string) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
-app.use('*', cors({ origin: (origin) => (isLocalOrigin(origin) ? origin : null), credentials: true, allowHeaders: ['content-type'] }))
+const allowedOrigins = (c: any) => String(c.env?.PUBLIC_APP_URL ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+app.use('*', cors({ origin: (origin, c) => (isLocalOrigin(origin) || allowedOrigins(c).includes(origin) ? origin : null), credentials: true, allowHeaders: ['content-type'] }))
 const SESSION_COOKIE = 'tiji_session'
 const SESSION_DAYS = 30
 
@@ -47,7 +48,7 @@ async function requireUser(c: any) { const user = await currentUser(c); if (!use
 async function createSession(c: any, userId: string) {
   const token = randomToken(32); const timestamp = Date.now(); const expires = new Date(timestamp + SESSION_DAYS * 86400000).toISOString()
   await c.env.DB.prepare('INSERT INTO sessions(id,user_id,token_hash,expires_at,created_at,last_seen_at) VALUES(?,?,?,?,?,?)').bind(id(), userId, await sha256(token), expires, now(), now()).run()
-  setCookie(c, SESSION_COOKIE, token, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: SESSION_DAYS * 86400 })
+  setCookie(c, SESSION_COOKIE, token, { httpOnly: true, secure: true, sameSite: isLocalOrigin(new URL(c.req.url).origin) ? 'Lax' : 'None', path: '/', maxAge: SESSION_DAYS * 86400 })
 }
 
 app.get('/health', (c) => json(c, { ok: true, service: 'tiji-api' }))
