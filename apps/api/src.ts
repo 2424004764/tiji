@@ -10,8 +10,11 @@ const app = new Hono<Env>().basePath('/api/v1')
 const isLocalOrigin = (origin: string) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
 const allowedOrigins = (c: any) => String(c.env?.PUBLIC_APP_URL ?? '').split(',').map((s) => s.trim()).filter(Boolean)
 app.use('*', cors({ origin: (origin, c) => (isLocalOrigin(origin) || allowedOrigins(c).includes(origin) ? origin : null), credentials: true, allowHeaders: ['content-type'] }))
+app.onError((err, c) => { console.error('[api] unhandled:', err); return fail(c, 'INTERNAL_ERROR', '服务内部错误', 500) })
 const SESSION_COOKIE = 'tiji_session'
 const SESSION_DAYS = 30
+// Cloudflare Workers 的 Web Crypto 对 PBKDF2 迭代次数上限为 100000
+const PBKDF2_ITERATIONS = 100000
 
 const json = (c: any, data: unknown, status = 200, meta: Record<string, unknown> = {}) => c.json({ data, error: null, meta }, status)
 const fail = (c: any, code: string, message: string, status: number) => c.json({ data: null, error: { code, message }, meta: {} }, status)
@@ -23,9 +26,9 @@ const randomToken = (length = 32) => base64url(bytes(length))
 const sha256 = async (value: string) => base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))))
 
 async function hashPassword(password: string, salt = randomToken(16)) {
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits'])
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: new TextEncoder().encode(salt), iterations: 120000, hash: 'SHA-256' }, key, 256)
-  return `pbkdf2$120000$${salt}$${base64url(new Uint8Array(bits))}`
+  const key = await crypto.subtle.importKey('raw', new Uint8Array(await new Blob([password]).arrayBuffer()), 'PBKDF2', false, ['deriveBits'])
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: new TextEncoder().encode(salt), iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' }, key, 256)
+  return `pbkdf2$${PBKDF2_ITERATIONS}$${salt}$${base64url(new Uint8Array(bits))}`
 }
 async function verifyPassword(password: string, stored: string) {
   const [, iterations, salt, expected] = stored.split('$')
