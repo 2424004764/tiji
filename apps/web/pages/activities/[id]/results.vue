@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import type { MessageKey } from '@tiji/i18n'
+
+const { t, apiError, formatDateTime, formatDuration } = useI18n()
+
 useSeoMeta({
-  title: '答题情况 · 题迹',
+  title: () => t('results.seo.title'),
   robots: 'noindex, nofollow'
 })
 
@@ -51,7 +55,19 @@ const detail = ref<RespondentDetail | null>(null)
 const detailLoading = ref(false)
 const selectedId = ref('')
 
-const statusLabels: Record<string, string> = { draft: '草稿', published: '进行中', paused: '已暂停', ended: '已结束', submitted: '已提交', in_progress: '答题中' }
+const statusKeyMap: Record<string, MessageKey> = {
+  draft: 'results.status.draft',
+  published: 'results.status.published',
+  paused: 'results.status.paused',
+  ended: 'results.status.ended',
+  submitted: 'results.status.submitted',
+  in_progress: 'results.status.in_progress'
+}
+
+function statusLabel(status: string | null) {
+  if (!status || !statusKeyMap[status]) return t('results.inProgress')
+  return t(statusKeyMap[status])
+}
 
 async function loadAll() {
   loading.value = true
@@ -67,7 +83,7 @@ async function loadAll() {
     summary.value = sum.data
     respondents.value = resp.data ?? []
   } catch (err: any) {
-    loadError.value = err?.data?.error?.code === 'AUTH_REQUIRED' ? '请先登录。' : '答题情况加载失败，请刷新重试。'
+    loadError.value = err?.data?.error?.code === 'AUTH_REQUIRED' ? t('api.errors.AUTH_REQUIRED') : t('results.loadFailed')
   } finally {
     loading.value = false
   }
@@ -87,24 +103,16 @@ async function openDetail(r: Respondent) {
   }
 }
 
-function formatTime(value: string | null) {
-  if (!value) return ''
-  try { return new Date(value).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) } catch { return value }
-}
+const typeKeyMap: Record<string, MessageKey> = { single_choice: 'question.type.single', multiple_choice: 'question.type.multiple', true_false: 'question.type.tf' }
 
-function formatDuration(seconds: number | null) {
-  if (seconds === null || seconds === undefined) return ''
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return m > 0 ? `${m} 分 ${s} 秒` : `${s} 秒`
+function typeLabel(type: string) {
+  return typeKeyMap[type] ? t(typeKeyMap[type]) : type
 }
-
-const typeLabels: Record<string, string> = { single_choice: '单选', multiple_choice: '多选', true_false: '判断' }
 
 function answerLabel(q: ResultQuestion, value: string | string[] | null) {
-  if (value === null || value === undefined || (Array.isArray(value) && !value.length)) return '未作答'
-  const label = (v: string) => q.type === 'true_false' ? (v === 'true' ? '正确' : '错误') : (q.options.find((o) => o.value === v)?.label ?? v)
-  if (Array.isArray(value)) return value.map(label).join('、')
+  if (value === null || value === undefined || (Array.isArray(value) && !value.length)) return t('common.notAnswered')
+  const label = (v: string) => q.type === 'true_false' ? (v === 'true' ? t('common.optionTrue') : t('common.optionFalse')) : (q.options.find((o) => o.value === v)?.label ?? v)
+  if (Array.isArray(value)) return value.map(label).join(t('common.listSeparator'))
   return String(value)
 }
 
@@ -118,42 +126,42 @@ onMounted(loadAll)
     <main class="container main">
       <template v-if="ready && !user">
         <div class="panel notice-panel">
-          <h1>请先登录</h1>
-          <p>登录后即可查看自己活动的答题情况。</p>
-          <NuxtLink to="/login" class="btn btn-primary">前往登录</NuxtLink>
+          <h1>{{ t('common.needLoginTitle') }}</h1>
+          <p>{{ t('results.needLoginDesc') }}</p>
+          <NuxtLink to="/login" class="btn btn-primary">{{ t('common.goLogin') }}</NuxtLink>
         </div>
       </template>
 
       <template v-else-if="loading" />
       <template v-else-if="loadError">
         <div class="panel notice-panel">
-          <h1>无法打开</h1>
+          <h1>{{ t('results.unableTitle') }}</h1>
           <p>{{ loadError }}</p>
-          <NuxtLink to="/banks" class="btn btn-primary">返回我的题库</NuxtLink>
+          <NuxtLink to="/banks" class="btn btn-primary">{{ t('bank.backToBanks') }}</NuxtLink>
         </div>
       </template>
 
       <template v-else-if="activity">
         <div class="head">
           <div>
-            <NuxtLink :to="`/banks/${activity.bank_id}`" class="back-link">返回题库</NuxtLink>
+            <NuxtLink :to="`/banks/${activity.bank_id}`" class="back-link">{{ t('results.backToBank') }}</NuxtLink>
             <h1 class="title">{{ activity.title }}</h1>
-            <p class="sub">共 {{ activity.question_count }} 道题 · <span :class="`act-status is-${activity.status}`">{{ statusLabels[activity.status] ?? activity.status }}</span></p>
+            <p class="sub">{{ t('results.questionCount', { n: activity.question_count }) }} <span :class="`act-status is-${activity.status}`">{{ statusLabel(activity.status) }}</span></p>
           </div>
         </div>
 
         <div class="stats">
-          <div class="stat"><span class="stat-num">{{ respondents.length }}</span><span class="stat-label">参与人数</span></div>
-          <div class="stat"><span class="stat-num">{{ summary?.submitted ?? 0 }}</span><span class="stat-label">已提交</span></div>
+          <div class="stat"><span class="stat-num">{{ respondents.length }}</span><span class="stat-label">{{ t('results.statParticipants') }}</span></div>
+          <div class="stat"><span class="stat-num">{{ summary?.submitted ?? 0 }}</span><span class="stat-label">{{ t('results.statSubmitted') }}</span></div>
           <div class="stat">
             <span class="stat-num">{{ summary?.average_score === null || summary?.average_score === undefined ? '—' : Number(summary.average_score).toFixed(1) }}</span>
-            <span class="stat-label">平均得分</span>
+            <span class="stat-label">{{ t('results.statAverage') }}</span>
           </div>
         </div>
 
         <section class="panel">
-          <h2 class="panel-title">答题名单</h2>
-          <p v-if="!respondents.length" class="hint">还没有人参与。把分享链接发给好友后，这里会列出每一位答题者。</p>
+          <h2 class="panel-title">{{ t('results.rosterTitle') }}</h2>
+          <p v-if="!respondents.length" class="hint">{{ t('results.rosterEmpty') }}</p>
           <ul v-else class="resp-list">
             <li v-for="r in respondents" :key="r.id">
               <button type="button" class="resp-row" :class="{ selected: selectedId === r.id }" @click="openDetail(r)">
@@ -162,9 +170,9 @@ onMounted(loadAll)
                   <span class="resp-name">{{ r.display_name }}</span>
                 </span>
                 <span class="resp-meta">
-                  <span class="badge" :class="r.status === 'submitted' ? 'is-public' : 'is-draft'">{{ statusLabels[r.status ?? ''] ?? '答题中' }}</span>
+                  <span class="badge" :class="r.status === 'submitted' ? 'is-public' : 'is-draft'">{{ statusLabel(r.status) }}</span>
                   <span v-if="r.score !== null" class="resp-score">{{ r.score }} / {{ r.total_points }}</span>
-                  <span v-if="r.submitted_at" class="resp-time">{{ formatTime(r.submitted_at) }}</span>
+                  <span v-if="r.submitted_at" class="resp-time">{{ formatDateTime(r.submitted_at) }}</span>
                 </span>
               </button>
             </li>
@@ -172,34 +180,34 @@ onMounted(loadAll)
         </section>
 
         <section v-if="selectedId" class="panel">
-          <h2 class="panel-title">作答详情</h2>
-          <p v-if="detailLoading" class="hint">加载中…</p>
+          <h2 class="panel-title">{{ t('results.detailTitle') }}</h2>
+          <p v-if="detailLoading" class="hint">{{ t('common.loading') }}</p>
           <template v-else-if="detail">
             <p class="detail-head">
               {{ detail.respondent.displayName }} ·
-              <template v-if="detail.respondent.score !== null">得分 {{ detail.respondent.score }} / {{ detail.respondent.totalPoints }}</template>
-              <template v-else>尚未提交</template>
-              <template v-if="detail.respondent.durationSeconds !== null && detail.respondent.durationSeconds !== undefined"> · 用时 {{ formatDuration(detail.respondent.durationSeconds) }}</template>
+              <template v-if="detail.respondent.score !== null">{{ t('results.detailScore', { score: detail.respondent.score, total: detail.respondent.totalPoints ?? 0 }) }}</template>
+              <template v-else>{{ t('results.notSubmitted') }}</template>
+              <template v-if="detail.respondent.durationSeconds !== null && detail.respondent.durationSeconds !== undefined"> · {{ t('results.durationPrefix') }} {{ formatDuration(detail.respondent.durationSeconds) }}</template>
             </p>
             <ul class="dq-list">
               <li v-for="q in detail.questions" :key="q.position" class="dq-item" :class="q.isCorrect === true ? 'is-ok' : q.isCorrect === false ? 'is-bad' : 'is-skip'">
                 <div class="dq-top">
                   <span class="dq-index">{{ q.position }}</span>
                   <span class="badge" :class="q.isCorrect === true ? 'is-public' : 'is-wrong'">
-                    {{ q.isCorrect === true ? '答对' : '答错' }}
+                    {{ q.isCorrect === true ? t('results.correct') : t('results.wrong') }}
                   </span>
-                  <span class="dq-type">{{ typeLabels[q.type] }}</span>
+                  <span class="dq-type">{{ typeLabel(q.type) }}</span>
                 </div>
                 <p class="dq-stem">{{ q.stem }}</p>
                 <div class="dq-answers">
-                  <p class="dq-line" :class="{ bad: q.isCorrect === false }">他的回答：<strong>{{ answerLabel(q, q.givenAnswer) }}</strong></p>
-                  <p class="dq-line ok">正确答案：<strong>{{ answerLabel(q, q.correctAnswer) }}</strong></p>
+                  <p class="dq-line" :class="{ bad: q.isCorrect === false }">{{ t('results.givenAnswer') }}<strong>{{ answerLabel(q, q.givenAnswer) }}</strong></p>
+                  <p class="dq-line ok">{{ t('results.correctAnswer') }}<strong>{{ answerLabel(q, q.correctAnswer) }}</strong></p>
                 </div>
                 <p v-if="q.explanation" class="dq-line dq-explain">{{ q.explanation }}</p>
               </li>
             </ul>
           </template>
-          <p v-else class="error">作答详情加载失败。</p>
+          <p v-else class="error">{{ t('results.detailFailed') }}</p>
         </section>
       </template>
     </main>

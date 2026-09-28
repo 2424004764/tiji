@@ -1,47 +1,57 @@
 <script setup lang="ts">
+const { t, locale } = useI18n()
+
 useSeoMeta({
-  title: '题迹｜自建题库，一条链接开始刷题',
-  description: '为班级、小组或自己创建题库，分享链接即可答题，错题、收藏与练习记录自动整理。',
-  ogTitle: '题迹｜自建题库，一条链接开始刷题',
-  ogDescription: '创建题库、发布答题活动、查看每题反馈，学习轨迹一目了然。'
+  title: () => t('home.seo.title'),
+  description: () => t('home.seo.description'),
+  ogTitle: () => t('home.seo.ogTitle'),
+  ogDescription: () => t('home.seo.ogDescription')
 })
 
-const { user, logout } = useAuth()
+const { user } = useAuth()
 
 interface DemoOption { value: string; label: string }
 interface DemoQuestion { typeLabel: string; stem: string; options: DemoOption[]; answer: string; explain: string }
 
-const questions: DemoQuestion[] = [
+// 示例题目随语言切换
+const questions = computed<DemoQuestion[]>(() => [
   {
-    typeLabel: '单选题',
-    stem: '地球上现存体型最大的动物是哪一种？',
+    typeLabel: t('home.demo.q1.type'),
+    stem: t('home.demo.q1.stem'),
     options: [
-      { value: 'a', label: '非洲象' },
-      { value: 'b', label: '蓝鲸' },
-      { value: 'c', label: '长颈鹿' },
-      { value: 'd', label: '虎鲸' }
+      { value: 'a', label: t('home.demo.q1.a') },
+      { value: 'b', label: t('home.demo.q1.b') },
+      { value: 'c', label: t('home.demo.q1.c') },
+      { value: 'd', label: t('home.demo.q1.d') }
     ],
     answer: 'b',
-    explain: '蓝鲸是地球生命史上已知最大的动物，成年体长可达 30 米。'
+    explain: t('home.demo.q1.explain')
   },
   {
-    typeLabel: '判断题',
-    stem: '在题迹中，答错的题目会自动收进错题本。',
+    typeLabel: t('home.demo.q2.type'),
+    stem: t('home.demo.q2.stem'),
     options: [
-      { value: 'true', label: '正确' },
-      { value: 'false', label: '错误' }
+      { value: 'true', label: t('common.optionTrue') },
+      { value: 'false', label: t('common.optionFalse') }
     ],
     answer: 'true',
-    explain: '答错的题会进入错题本，并保留正确答案与解析，方便集中复习。'
+    explain: t('home.demo.q2.explain')
   }
-]
+])
 
 const index = ref(0)
 const picked = ref<string | null>(null)
 const score = ref(0)
 const finished = ref(false)
 
-const current = computed(() => questions[index.value])
+// 切换语言后回到第一题，避免题目/进度错位
+watch(locale, () => {
+  index.value = 0
+  picked.value = null
+  finished.value = false
+})
+
+const current = computed(() => questions.value[index.value])
 const answerLabel = computed(() => current.value.options.find((o) => o.value === current.value.answer)?.label ?? '')
 
 function optionClass(value: string) {
@@ -58,7 +68,7 @@ function pick(value: string) {
 }
 
 function next() {
-  if (index.value >= questions.length - 1) {
+  if (index.value >= questions.value.length - 1) {
     finished.value = true
     return
   }
@@ -72,6 +82,12 @@ function restart() {
   score.value = 0
   finished.value = false
 }
+
+function feedbackText() {
+  return picked.value === current.value.answer
+    ? t('home.demo.correct')
+    : t('home.demo.correctAnswerIs', { answer: answerLabel.value })
+}
 </script>
 
 <template>
@@ -82,18 +98,18 @@ function restart() {
       <section class="hero">
         <div class="container hero-grid">
           <div class="hero-copy">
-            <h1>出题、分享、刷题，<br />留下进步的<em>轨迹</em>。</h1>
-            <p class="hero-sub">为班级、小组或自己创建题库，一条链接即可开始答题，错题与练习记录自动整理。</p>
+            <h1>{{ t('home.hero.titleTop') }}<br />{{ t('home.hero.titleLead') }}<em>{{ t('home.hero.titleEm') }}</em>{{ t('home.hero.titleTail') }}</h1>
+            <p class="hero-sub">{{ t('home.hero.sub') }}</p>
             <div class="hero-actions">
-              <NuxtLink :to="user ? '/banks' : '/login'" class="btn btn-primary">免费创建题库</NuxtLink>
-              <a href="#how" class="btn btn-secondary">了解如何运作</a>
+              <NuxtLink :to="user ? '/banks' : '/login'" class="btn btn-primary">{{ t('home.hero.ctaPrimary') }}</NuxtLink>
+              <a href="#how" class="btn btn-secondary">{{ t('home.hero.ctaSecondary') }}</a>
             </div>
           </div>
 
           <div class="hero-demo">
-            <div class="quiz-card" role="group" aria-label="题迹答题示例">
+            <div class="quiz-card" role="group" :aria-label="t('home.hero.demoAria')" :style="{ '--label-correct': `'${t('home.demo.correctLabel')}'`, '--label-yours': `'${t('home.demo.yourLabel')}'` }">
               <div class="quiz-head">
-                <span class="quiz-tag">示例 · {{ finished ? '已完成' : current.typeLabel }}</span>
+                <span class="quiz-tag">{{ t('home.demo.tag') }} · {{ finished ? t('home.demo.finished') : current.typeLabel }}</span>
                 <span class="quiz-progress">{{ Math.min(index + 1, questions.length) }} / {{ questions.length }}</span>
               </div>
 
@@ -111,20 +127,20 @@ function restart() {
                   >{{ opt.label }}</button>
                 </div>
                 <p v-if="picked !== null" class="quiz-feedback" :class="picked === current.answer ? 'is-ok' : 'is-bad'">
-                  {{ picked === current.answer ? '回答正确。' : `正确答案是「${answerLabel}」。` }}
+                  {{ feedbackText() }}
                   {{ current.explain }}
                 </p>
                 <button v-if="picked !== null" type="button" class="btn btn-primary btn-sm quiz-next" @click="next">
-                  {{ index >= questions.length - 1 ? '查看结果' : '下一题' }}
+                  {{ index >= questions.length - 1 ? t('home.demo.seeResults') : t('home.demo.next') }}
                 </button>
               </template>
 
               <template v-else>
                 <p class="quiz-result-score">{{ score }} / {{ questions.length }}</p>
-                <p class="quiz-result-text">示例结束。真实的答题活动里，得分、用时和每题反馈都会记入创建者的结果页。</p>
+                <p class="quiz-result-text">{{ t('home.demo.resultText') }}</p>
                 <div class="quiz-result-actions">
-                  <button type="button" class="btn btn-secondary btn-sm" @click="restart">再试一次</button>
-                  <NuxtLink :to="user ? '/banks' : '/login'" class="btn btn-primary btn-sm">免费创建题库</NuxtLink>
+                  <button type="button" class="btn btn-secondary btn-sm" @click="restart">{{ t('home.demo.retry') }}</button>
+                  <NuxtLink :to="user ? '/banks' : '/login'" class="btn btn-primary btn-sm">{{ t('home.hero.ctaPrimary') }}</NuxtLink>
                 </div>
               </template>
             </div>
@@ -134,22 +150,22 @@ function restart() {
 
       <section id="how" class="steps">
         <div class="container">
-          <h2>三步，从出题到反馈。</h2>
+          <h2>{{ t('home.steps.title') }}</h2>
           <div class="steps-grid">
             <div class="step">
               <span class="step-num" aria-hidden="true">1</span>
-              <h3>创建题库</h3>
-              <p>按科目或章节录入题目，支持单选与判断题型，每题可附解析和难度。</p>
+              <h3>{{ t('home.steps.s1.title') }}</h3>
+              <p>{{ t('home.steps.s1.desc') }}</p>
             </div>
             <div class="step">
               <span class="step-num" aria-hidden="true">2</span>
-              <h3>分享链接</h3>
-              <p>把题库发布为答题活动，任何人点开链接、填一个显示名就能作答，无需注册。</p>
+              <h3>{{ t('home.steps.s2.title') }}</h3>
+              <p>{{ t('home.steps.s2.desc') }}</p>
             </div>
             <div class="step">
               <span class="step-num" aria-hidden="true">3</span>
-              <h3>查看反馈</h3>
-              <p>参与人数、正确率与每题分析实时汇总，哪里薄弱一眼可见。</p>
+              <h3>{{ t('home.steps.s3.title') }}</h3>
+              <p>{{ t('home.steps.s3.desc') }}</p>
             </div>
           </div>
         </div>
@@ -157,31 +173,31 @@ function restart() {
 
       <section id="features" class="features">
         <div class="container">
-          <h2>练过的每一题，都有迹可循。</h2>
+          <h2>{{ t('home.features.title') }}</h2>
           <div class="bento">
             <article class="cell cell-mistake">
-              <h3>错题本</h3>
-              <p>答错的题自动归集，保留正确答案与解析，考前集中攻克。</p>
+              <h3>{{ t('home.features.mistakes.title') }}</h3>
+              <p>{{ t('home.features.mistakes.desc') }}</p>
               <div class="mini-row">
-                <span class="mini-badge is-bad">错题</span>
-                <span>浮力产生的原因</span>
+                <span class="mini-badge is-bad">{{ t('home.features.mistakes.badgeBad') }}</span>
+                <span>{{ t('home.features.mistakes.sampleBad') }}</span>
               </div>
               <div class="mini-row">
-                <span class="mini-badge is-ok">已掌握</span>
-                <span>光的折射定律</span>
+                <span class="mini-badge is-ok">{{ t('home.features.mistakes.badgeOk') }}</span>
+                <span>{{ t('home.features.mistakes.sampleOk') }}</span>
               </div>
             </article>
             <article class="cell cell-note">
-              <h3>收藏夹</h3>
-              <p>好题、易错题一键收藏，随时回看。</p>
+              <h3>{{ t('home.features.favorites.title') }}</h3>
+              <p>{{ t('home.features.favorites.desc') }}</p>
             </article>
             <article class="cell">
-              <h3>答题记录</h3>
-              <p>每次练习的得分与用时自动留痕，进步看得见。</p>
+              <h3>{{ t('home.features.records.title') }}</h3>
+              <p>{{ t('home.features.records.desc') }}</p>
             </article>
             <article class="cell cell-anywhere">
-              <h3>多端可练</h3>
-              <p>电脑、平板、手机的浏览器都能直接使用，登录同一账号随时继续。</p>
+              <h3>{{ t('home.features.anywhere.title') }}</h3>
+              <p>{{ t('home.features.anywhere.desc') }}</p>
             </article>
           </div>
         </div>
@@ -190,8 +206,8 @@ function restart() {
       <section class="cta">
         <div class="container">
           <div class="cta-panel">
-            <h2>创建你的第一个题库，只需要几分钟。</h2>
-            <NuxtLink :to="user ? '/banks' : '/login'" class="btn btn-inverse">免费创建题库</NuxtLink>
+            <h2>{{ t('home.cta.title') }}</h2>
+            <NuxtLink :to="user ? '/banks' : '/login'" class="btn btn-inverse">{{ t('home.cta.button') }}</NuxtLink>
           </div>
         </div>
       </section>
@@ -200,16 +216,16 @@ function restart() {
     <footer class="footer">
       <div class="container footer-inner">
         <div class="footer-brand">
-          <strong>题迹</strong>
-          <span>自建题库与答题反馈工具</span>
+          <strong>{{ t('common.appName') }}</strong>
+          <span>{{ t('common.tagline') }}</span>
         </div>
-        <nav class="footer-nav" aria-label="页脚导航">
-          <a href="#how">如何运作</a>
-          <a href="#features">功能</a>
-          <NuxtLink v-if="user" to="/banks">我的题库</NuxtLink>
-          <NuxtLink v-else to="/login">登录</NuxtLink>
+        <nav class="footer-nav" :aria-label="t('home.footer.navAria')">
+          <a href="#how">{{ t('home.footer.how') }}</a>
+          <a href="#features">{{ t('home.footer.features') }}</a>
+          <NuxtLink v-if="user" to="/banks">{{ t('home.footer.myBanks') }}</NuxtLink>
+          <NuxtLink v-else to="/login">{{ t('home.footer.login') }}</NuxtLink>
         </nav>
-        <span class="footer-copy">© 2026 题迹</span>
+        <span class="footer-copy">© 2026 {{ t('common.appName') }}</span>
       </div>
     </footer>
   </div>
@@ -262,9 +278,9 @@ function restart() {
 .quiz-option:hover:not(:disabled) { border-color: var(--accent); }
 .quiz-option:disabled { cursor: default; }
 .quiz-option.is-correct { border-color: var(--accent); background: var(--accent-soft); }
-.quiz-option.is-correct::after { content: '正确答案'; float: right; font-size: 12px; font-weight: 600; color: var(--accent-strong); }
+.quiz-option.is-correct::after { content: var(--label-correct); float: right; font-size: 12px; font-weight: 600; color: var(--accent-strong); }
 .quiz-option.is-wrong { border-color: var(--wrong); background: var(--wrong-soft); }
-.quiz-option.is-wrong::after { content: '你的回答'; float: right; font-size: 12px; font-weight: 600; color: var(--wrong); }
+.quiz-option.is-wrong::after { content: var(--label-yours); float: right; font-size: 12px; font-weight: 600; color: var(--wrong); }
 .quiz-option.is-dim { opacity: 0.45; }
 .quiz-feedback { margin: 16px 0 0; font-size: 14px; line-height: 1.75; }
 .quiz-feedback.is-ok { color: var(--accent-strong); }
@@ -306,7 +322,7 @@ function restart() {
   background-size: 26px 26px;
 }
 .cell-anywhere { grid-column: 1 / -1; display: flex; align-items: center; gap: 32px; }
-.cell-anywhere h3 { margin: 0; font-size: 21px; white-space: nowrap; }
+.cell-anywhere h3 { margin: 0; font-size: 21px; }
 .cell-anywhere p { font-size: 15px; }
 
 /* CTA */

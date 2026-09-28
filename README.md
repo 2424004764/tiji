@@ -24,9 +24,20 @@
 
 - 后端：Cloudflare Workers、Hono、TypeScript、D1
 - 交互与 SEO Web：Nuxt 3、Vue 3、TypeScript、Pinia
-- 首期语言：`zh-CN`、`en-US`
+- 界面语言：`zh-CN` / `en-US` 中英文可切换（见下方「多语言支持」）
 - 首期题型：选择题（勾 1 个答案为单选，勾 2 个及以上为多选）与判断题
 - 登录：用户名 + 密码；答题者不强制注册
+
+## 多语言支持（中文 / 英文）
+
+Web 端内置 `zh-CN` 与 `en-US` 双语文案。页面右上角（公开答题页在顶栏）有语言切换器，点击即时生效、无需刷新：
+
+- 语言优先级：用户选择（cookie `tiji_locale`，保存一年）→ 浏览器 `Accept-Language` 自动检测 → 默认 `zh-CN`
+- 切换后 `<html lang>`、页面标题、SEO 描述与 `og:locale` 同步更新，刷新后保持所选语言
+- 全部用户可见文案集中在 `packages/i18n/src.ts`，key 按领域命名（如 `bank.share.copyLink`），组件内不硬编码文案
+- API 错误码（如 `USERNAME_TAKEN`、`ACTIVITY_NOT_OPEN`）由前端按当前语言映射展示
+- 日期、时间与用时按 locale 使用 `Intl` 格式化；英文复数使用 `1 question | {n} questions` 模板语法
+- 新增语言：在 `packages/i18n/src.ts` 中按 `MessageSchema` 类型补充对应文案目录，并在 `locales` 列表注册即可
 
 ## 文档
 

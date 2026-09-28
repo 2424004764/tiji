@@ -1,6 +1,8 @@
 <script setup lang="ts">
+const { t, apiError } = useI18n()
+
 useSeoMeta({
-  title: '答题 · 题迹',
+  title: () => t('quiz.seo.title'),
   robots: 'noindex, nofollow'
 })
 
@@ -30,7 +32,7 @@ const answeredCount = computed(() => questions.value.filter((q) => {
   return Array.isArray(v) ? v.length > 0 : !!v
 }).length)
 
-const typeLabel = (type: string) => type === 'single_choice' ? '单选' : type === 'multiple_choice' ? '多选' : '判断'
+const typeLabel = (type: string) => type === 'single_choice' ? t('question.type.single') : type === 'multiple_choice' ? t('question.type.multiple') : t('question.type.tf')
 
 const NAME_KEY = 'tiji:displayName'
 
@@ -109,10 +111,10 @@ onMounted(async () => {
     const res = await $fetch<{ data: { title: string; description: string; bank_name?: string; questions: PubQuestion[] } }>(`${config.public.apiBase}/public/activities/${route.params.token}`)
     activity.value = { title: res.data.title, description: res.data.description, bankName: res.data.bank_name ?? '' }
     questions.value = res.data.questions ?? []
-    if (!questions.value.length) loadError.value = '这个活动还没有题目。'
+    if (!questions.value.length) loadError.value = t('quiz.noQuestions')
     else if (displayName.value.trim()) start()
   } catch (err: any) {
-    loadError.value = err?.data?.error?.code === 'ACTIVITY_NOT_OPEN' ? '活动已结束或尚未开放。' : '活动不存在或链接有误。'
+    loadError.value = err?.data?.error?.code === 'ACTIVITY_NOT_OPEN' ? t('quiz.notOpen') : t('quiz.notFound')
   } finally {
     loading.value = false
   }
@@ -121,7 +123,7 @@ onMounted(async () => {
 async function start() {
   startError.value = ''
   if (!displayName.value.trim()) {
-    startError.value = '请输入你的显示名。'
+    startError.value = t('quiz.missingName')
     return
   }
   starting.value = true
@@ -134,7 +136,7 @@ async function start() {
     saveName()
     phase.value = 'quiz'
   } catch (err: any) {
-    startError.value = err?.data?.error?.message || '开始失败，请稍后重试。'
+    startError.value = apiError(err, 'common.requestFailed')
   } finally {
     starting.value = false
   }
@@ -160,7 +162,7 @@ async function submitAnswers() {
   submitError.value = ''
   const unanswered = questions.value.length - answeredCount.value
   if (unanswered > 0) {
-    if (!window.confirm(`还有 ${unanswered} 道题未作答，未答的题按错误计分。确定提交吗？`)) return
+    if (!window.confirm(t('quiz.unansweredConfirm', { n: unanswered }))) return
   }
   submitting.value = true
   try {
@@ -171,7 +173,7 @@ async function submitAnswers() {
     result.value = res.data
     phase.value = 'result'
   } catch (err: any) {
-    submitError.value = err?.data?.error?.message || '提交失败，请稍后重试。'
+    submitError.value = apiError(err, 'common.requestFailed')
   } finally {
     submitting.value = false
   }
@@ -180,30 +182,33 @@ async function submitAnswers() {
 
 <template>
   <div class="quiz-page">
-    <header class="top"><NuxtLink to="/" class="brand" aria-label="题迹首页"><AppLogo /></NuxtLink></header>
+    <header class="top">
+      <NuxtLink to="/" class="brand" :aria-label="t('nav.homeAria')"><AppLogo /></NuxtLink>
+      <LocaleSwitch class="top-locale" />
+    </header>
 
     <main class="wrap">
-      <p v-if="loading" class="hint">加载中…</p>
+      <p v-if="loading" class="hint">{{ t('common.loading') }}</p>
 
       <div v-else-if="loadError" class="card">
         <h1>{{ loadError }}</h1>
-        <p class="hint">如果你有题迹账号，可以登录后创建自己的题库和分享活动。</p>
-        <NuxtLink to="/" class="btn btn-primary">去题迹看看</NuxtLink>
+        <p class="hint">{{ t('quiz.promoHint') }}</p>
+        <NuxtLink to="/" class="btn btn-primary">{{ t('quiz.promoCta') }}</NuxtLink>
       </div>
 
       <div v-else-if="phase === 'name' && activity" class="card">
-        <p class="eyebrow">答题邀请</p>
+        <p class="eyebrow">{{ t('quiz.inviteEyebrow') }}</p>
         <h1>{{ activity.title }}</h1>
-        <p v-if="activity.bankName" class="bank">来自题库「{{ activity.bankName }}」</p>
+        <p v-if="activity.bankName" class="bank">{{ t('quiz.fromBank', { name: activity.bankName }) }}</p>
         <p v-if="activity.description" class="desc">{{ activity.description }}</p>
-        <p class="meta">共 {{ questions.length }} 道题 · 无需注册，输入显示名即可开始</p>
+        <p class="meta">{{ t('quiz.meta', { n: questions.length }) }}</p>
         <form @submit.prevent="start">
           <label class="field">
-            你的显示名
-            <input v-model="displayName" maxlength="40" required placeholder="例如：小明" />
+            {{ t('quiz.displayName') }}
+            <input v-model="displayName" maxlength="40" required :placeholder="t('quiz.displayNamePlaceholder')" />
           </label>
           <p v-if="startError" class="error">{{ startError }}</p>
-          <button type="submit" class="btn btn-primary btn-block" :disabled="starting">{{ starting ? '准备中…' : '开始答题' }}</button>
+          <button type="submit" class="btn btn-primary btn-block" :disabled="starting">{{ starting ? t('quiz.preparing') : t('quiz.start') }}</button>
         </form>
       </div>
 
@@ -213,10 +218,10 @@ async function submitAnswers() {
           <span v-if="activity?.bankName" class="quiz-context-bank">· {{ activity.bankName }}</span>
         </p>
         <div class="quiz-topbar">
-          <span>第 {{ current + 1 }} 题 / 共 {{ questions.length }} 题</span>
+          <span>{{ t('quiz.progress', { current: current + 1, total: questions.length }) }}</span>
           <span class="who">
             <span class="who-name">{{ displayName }}</span>
-            <button type="button" class="sheet-trigger" @click="sheetOpen = true">答题卡</button>
+            <button type="button" class="sheet-trigger" @click="sheetOpen = true">{{ t('quiz.answerSheet') }}</button>
           </span>
         </div>
 
@@ -226,7 +231,7 @@ async function submitAnswers() {
               <div class="slide-card">
                 <p class="stem">{{ i + 1 }}. {{ q.stem }}<span class="q-type">{{ typeLabel(q.type) }}</span></p>
                 <p v-if="q.tags && q.tags.length" class="q-tags">
-                  <span v-for="t in q.tags" :key="t" class="chip">{{ t }}</span>
+                  <span v-for="tag in q.tags" :key="tag" class="chip">{{ tag }}</span>
                 </p>
                 <div class="options">
                   <button
@@ -244,32 +249,32 @@ async function submitAnswers() {
         </div>
 
         <div class="quiz-nav">
-          <button type="button" class="nav-btn" :disabled="current === 0" @click="prevQuestion">← 上一题</button>
-          <div class="dots" role="tablist" aria-label="题目进度">
+          <button type="button" class="nav-btn" :disabled="current === 0" @click="prevQuestion">{{ t('quiz.prev') }}</button>
+          <div class="dots" role="tablist" :aria-label="t('quiz.progressAria')">
             <span
               v-for="(q, i) in questions"
               :key="q.id"
               class="dot"
               :class="{ active: i === current, done: isAnswered(q) }"
               role="tab"
-              :aria-label="`第 ${i + 1} 题`"
+              :aria-label="t('quiz.questionAria', { n: i + 1 })"
               @click="current = i"
             />
           </div>
-          <button type="button" class="nav-btn" :disabled="current === questions.length - 1" @click="nextQuestion">下一题 →</button>
+          <button type="button" class="nav-btn" :disabled="current === questions.length - 1" @click="nextQuestion">{{ t('quiz.next') }}</button>
         </div>
 
         <p v-if="submitError" class="error">{{ submitError }}</p>
         <button type="button" class="btn btn-primary btn-block" :disabled="submitting" @click="submitAnswers">
-          {{ submitting ? '提交中…' : '提交答卷' }}
+          {{ submitting ? t('quiz.submitting') : t('quiz.submit') }}
         </button>
 
         <div v-if="sheetOpen" class="sheet-mask" @click.self="sheetOpen = false">
-          <div class="sheet" role="dialog" aria-label="答题卡">
+          <div class="sheet" role="dialog" :aria-label="t('quiz.answerSheet')">
             <div class="sheet-head">
-              <strong>答题卡</strong>
-              <span class="hint">已答 {{ answeredCount }} / {{ questions.length }}</span>
-              <button type="button" class="sheet-close" @click="sheetOpen = false">完成</button>
+              <strong>{{ t('quiz.answerSheet') }}</strong>
+              <span class="hint">{{ t('quiz.sheetAnswered', { done: answeredCount, total: questions.length }) }}</span>
+              <button type="button" class="sheet-close" @click="sheetOpen = false">{{ t('quiz.sheetDone') }}</button>
             </div>
             <div class="sheet-grid">
               <button
@@ -281,16 +286,16 @@ async function submitAnswers() {
                 @click="jumpTo(i)"
               >{{ i + 1 }}</button>
             </div>
-            <p class="sheet-hint">绿色 = 已作答，点击题号直接跳转</p>
+            <p class="sheet-hint">{{ t('quiz.sheetHint') }}</p>
           </div>
         </div>
       </div>
 
       <div v-else-if="phase === 'result' && result" class="card result-card">
-        <p class="eyebrow">答题完成</p>
+        <p class="eyebrow">{{ t('quiz.resultEyebrow') }}</p>
         <p class="score">{{ result.score }}<span class="total">/ {{ result.totalPoints }}</span></p>
-        <p class="thanks">{{ displayName }}，感谢作答！结果已同步给出题人。</p>
-        <button type="button" class="btn btn-secondary" @click="phase = 'quiz'; submitError = ''">返回检查答卷</button>
+        <p class="thanks">{{ t('quiz.thanks', { name: displayName }) }}</p>
+        <button type="button" class="btn btn-secondary" @click="phase = 'quiz'; submitError = ''">{{ t('quiz.review') }}</button>
       </div>
     </main>
   </div>
@@ -306,7 +311,7 @@ async function submitAnswers() {
   background-size: 36px 36px;
 }
 .top {
-  height: 64px; display: flex; align-items: center; padding: 0 28px;
+  height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px;
   border-bottom: 1px solid var(--line);
   background: rgba(246, 247, 246, 0.86);
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);

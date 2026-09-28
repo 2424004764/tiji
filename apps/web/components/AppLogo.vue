@@ -9,14 +9,16 @@
  */
 const logoSrc = ''
 
+const { t } = useI18n()
+
 withDefaults(defineProps<{ text?: boolean }>(), { text: true })
 </script>
 
 <template>
   <span class="logo">
-    <img v-if="logoSrc" :src="logoSrc" alt="题迹" class="logo-img" />
+    <img v-if="logoSrc" :src="logoSrc" :alt="t('common.appName')" class="logo-img" />
     <span v-else class="logo-mark" aria-hidden="true" />
-    <span v-if="text" class="logo-text">题迹</span>
+    <span v-if="text" class="logo-text">{{ t('common.appName') }}</span>
   </span>
 </template>
 

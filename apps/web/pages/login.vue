@@ -1,11 +1,14 @@
 <script setup lang="ts">
+const { t } = useI18n()
+
 useSeoMeta({
-  title: '登录 · 题迹',
-  description: '登录题迹，管理你的题库与答题活动。'
+  title: () => t('login.seo.title'),
+  description: () => t('login.seo.description')
 })
 
 const config = useRuntimeConfig()
 const { user, ready, setAuthenticated, logout } = useAuth()
+const { apiError } = useI18n()
 const mode = ref<'login' | 'register'>('login')
 const username = ref('')
 const password = ref('')
@@ -15,7 +18,7 @@ const error = ref('')
 async function submit() {
   error.value = ''
   if (!username.value || !password.value) {
-    error.value = '请输入用户名和密码。'
+    error.value = t('login.missing')
     return
   }
   loading.value = true
@@ -28,7 +31,7 @@ async function submit() {
     setAuthenticated(response.data)
     await navigateTo('/banks')
   } catch (err: any) {
-    error.value = err?.data?.error?.message || '请求失败，请稍后重试。'
+    error.value = apiError(err, 'common.requestFailed')
   } finally {
     loading.value = false
   }
@@ -42,39 +45,40 @@ function switchMode(next: 'login' | 'register') {
 
 <template>
   <div class="auth-page">
-    <NuxtLink to="/" class="back">返回首页</NuxtLink>
+    <NuxtLink to="/" class="back">{{ t('common.backHome') }}</NuxtLink>
+    <LocaleSwitch class="page-locale" />
     <div class="auth-card">
       <div class="brand-row"><AppLogo /></div>
 
       <template v-if="!ready" />
       <template v-else-if="user">
-        <p class="logged-hint">当前已登录为 <strong>{{ user.username }}</strong>，无需再次登录。</p>
+        <p class="logged-hint">{{ t('login.loggedHint', { name: user.username }) }}</p>
         <div class="logged-actions">
-          <NuxtLink to="/banks" class="btn btn-primary btn-block">我的题库</NuxtLink>
-          <NuxtLink to="/" class="btn btn-secondary btn-block">进入首页</NuxtLink>
-          <button type="button" class="btn btn-ghost btn-block" @click="logout">退出登录</button>
+          <NuxtLink to="/banks" class="btn btn-primary btn-block">{{ t('login.goBanks') }}</NuxtLink>
+          <NuxtLink to="/" class="btn btn-secondary btn-block">{{ t('login.goHome') }}</NuxtLink>
+          <button type="button" class="btn btn-ghost btn-block" @click="logout">{{ t('login.logout') }}</button>
         </div>
       </template>
 
       <template v-else>
-        <div class="tabs" role="tablist" aria-label="登录或注册">
-          <button type="button" role="tab" :aria-selected="mode === 'login'" :class="{ active: mode === 'login' }" @click="switchMode('login')">登录</button>
-          <button type="button" role="tab" :aria-selected="mode === 'register'" :class="{ active: mode === 'register' }" @click="switchMode('register')">注册</button>
+        <div class="tabs" role="tablist" :aria-label="t('login.tabsAria')">
+          <button type="button" role="tab" :aria-selected="mode === 'login'" :class="{ active: mode === 'login' }" @click="switchMode('login')">{{ t('login.tabLogin') }}</button>
+          <button type="button" role="tab" :aria-selected="mode === 'register'" :class="{ active: mode === 'register' }" @click="switchMode('register')">{{ t('login.tabRegister') }}</button>
         </div>
-        <p class="mode-hint">{{ mode === 'login' ? '欢迎回来，请输入账号信息。' : '注册后即可创建题库，注册即登录。' }}</p>
+        <p class="mode-hint">{{ mode === 'login' ? t('login.hintLogin') : t('login.hintRegister') }}</p>
 
         <form @submit.prevent="submit">
           <label class="field">
-            用户名
+            {{ t('login.username') }}
             <input v-model="username" autocomplete="username" required minlength="3" maxlength="32" />
           </label>
           <label class="field">
-            密码
+            {{ t('login.password') }}
             <input v-model="password" type="password" :autocomplete="mode === 'login' ? 'current-password' : 'new-password'" required minlength="8" maxlength="128" />
           </label>
           <p v-if="error" class="error">{{ error }}</p>
           <button type="submit" class="btn btn-primary btn-block" :disabled="loading">
-            {{ loading ? '提交中…' : mode === 'login' ? '登录' : '注册并登录' }}
+            {{ loading ? t('login.submitting') : mode === 'login' ? t('login.submitLogin') : t('login.submitRegister') }}
           </button>
         </form>
       </template>
@@ -92,6 +96,7 @@ function switchMode(next: 'login' | 'register') {
 }
 .back { position: absolute; top: 24px; left: 28px; font-size: 14px; color: var(--muted); text-decoration: none; transition: color 0.15s ease; }
 .back:hover { color: var(--ink); }
+.page-locale { position: absolute; top: 22px; right: 28px; }
 .auth-card {
   width: min(100%, 420px); background: var(--surface);
   border: 1px solid var(--line); border-radius: var(--radius-lg);
@@ -112,6 +117,9 @@ form { display: grid; gap: 16px; margin-top: 4px; }
 .btn-block { margin-top: 6px; }
 .btn-block + .btn-block { margin-top: 10px; }
 .logged-hint { margin: 4px 0 22px; font-size: 15px; line-height: 1.7; color: var(--ink); }
-.logged-hint strong { color: var(--accent-strong); }
 .logged-actions { display: grid; }
+@media (max-width: 640px) {
+  .back { top: 18px; left: 20px; }
+  .page-locale { top: 16px; right: 16px; }
+}
 </style>

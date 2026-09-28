@@ -2,5 +2,9 @@
   "name": "@tiji/i18n",
   "private": true,
   "version": "0.1.0",
-  "type": "module"
+  "type": "module",
+  "main": "./src.ts",
+  "exports": {
+    ".": "./src.ts"
+  }
 }

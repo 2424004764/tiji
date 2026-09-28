@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import type { MessageKey } from '@tiji/i18n'
+
+const { t, apiError } = useI18n()
+
 useSeoMeta({
-  title: '题库详情 · 题迹',
+  title: () => t('bank.seo.title'),
   robots: 'noindex, nofollow'
 })
 
@@ -51,9 +55,9 @@ async function resyncSnapshot() {
   syncMessage.value = ''
   try {
     await $fetch(`${config.public.apiBase}/activities/${activity.value.id}/publish`, { method: 'POST', credentials: 'include' })
-    syncMessage.value = '已同步题库最新内容到答题活动。'
+    syncMessage.value = t('bank.share.syncSuccess')
   } catch (err: any) {
-    syncMessage.value = err?.data?.error?.message || '同步失败，请稍后重试。'
+    syncMessage.value = apiError(err, 'common.requestFailed')
   } finally {
     syncing.value = false
   }
@@ -78,13 +82,21 @@ const savingSettings = ref(false)
 const settingsError = ref('')
 const settingsSuccess = ref('')
 
-const typeLabels: Record<string, string> = { single_choice: '单选', multiple_choice: '多选', true_false: '判断' }
-const difficultyLabels: Record<number, string> = { 1: '简单', 2: '较易', 3: '中等', 4: '较难', 5: '困难' }
-const visibilityLabels: Record<string, string> = { private: '私密', public: '公开' }
+const typeKeyMap: Record<string, MessageKey> = { single_choice: 'question.type.single', multiple_choice: 'question.type.multiple', true_false: 'question.type.tf' }
+const difficultyKeyMap: Record<number, MessageKey> = { 1: 'question.difficulty.d1', 2: 'question.difficulty.d2', 3: 'question.difficulty.d3', 4: 'question.difficulty.d4', 5: 'question.difficulty.d5' }
+
+function typeLabel(type: string) {
+  return typeKeyMap[type] ? t(typeKeyMap[type]) : type
+}
+
+function difficultyLabel(level: number) {
+  return difficultyKeyMap[level] ? t(difficultyKeyMap[level]) : t('question.difficulty.d3')
+}
 
 function answerText(q: BankQuestion) {
-  if (q.type === 'true_false') return q.answer === 'true' ? '正确' : '错误'
-  if (Array.isArray(q.answer)) return q.answer.map((v) => q.options.find((o) => o.value === v)?.label ?? v).join('、')
+  const separator = t('common.listSeparator')
+  if (q.type === 'true_false') return q.answer === 'true' ? t('common.optionTrue') : t('common.optionFalse')
+  if (Array.isArray(q.answer)) return q.answer.map((v) => q.options.find((o) => o.value === v)?.label ?? v).join(separator)
   return q.options.length ? (q.options.find((o) => o.value === q.answer)?.label ?? String(q.answer)) : String(q.answer)
 }
 
@@ -116,7 +128,7 @@ async function saveSettings() {
   settingsError.value = ''
   settingsSuccess.value = ''
   if (!settingName.value.trim()) {
-    settingsError.value = '题库名称不能为空。'
+    settingsError.value = t('bank.settings.missingName')
     return
   }
   savingSettings.value = true
@@ -127,9 +139,9 @@ async function saveSettings() {
       body: { name: settingName.value.trim(), description: settingDescription.value.trim(), visibility: settingVisibility.value }
     })
     if (res.data) bank.value = res.data
-    settingsSuccess.value = settingVisibility.value === 'public' ? '设置已保存：题库已设为公开。' : '设置已保存：题库已设为私密。'
+    settingsSuccess.value = settingVisibility.value === 'public' ? t('bank.settings.savedPublic') : t('bank.settings.savedPrivate')
   } catch (err: any) {
-    settingsError.value = err?.data?.error?.message || '保存失败，请稍后重试。'
+    settingsError.value = apiError(err, 'common.requestFailed')
   } finally {
     savingSettings.value = false
   }
@@ -141,8 +153,8 @@ async function loadQuestions() {
   try {
     const res = await $fetch<{ data: BankQuestion[] }>(`${config.public.apiBase}/banks/${bankId.value}/questions`, { credentials: 'include' })
     questions.value = res.data ?? []
-  } catch {
-    listError.value = '题目加载失败，请刷新重试。'
+  } catch (err: any) {
+    listError.value = apiError(err, 'bank.list.error')
   } finally {
     listLoading.value = false
   }
@@ -187,21 +199,21 @@ async function submitQuestion() {
   saveError.value = ''
   saveSuccess.value = ''
   if (!stem.value.trim()) {
-    saveError.value = '请输入题干。'
+    saveError.value = t('bank.add.missingStem')
     return
   }
   if (qType.value === 'choice') {
     const filled = optionRows.value.filter((o) => o.label.trim())
     if (filled.length < 2) {
-      saveError.value = '选择题至少需要填写两个选项。'
+      saveError.value = t('bank.add.missingOptions')
       return
     }
     if (!multiAnswer.value.length) {
-      saveError.value = '请勾选正确答案。'
+      saveError.value = t('bank.add.missingAnswer')
       return
     }
   } else if (!answer.value) {
-    saveError.value = '请选择判断题答案。'
+    saveError.value = t('bank.add.missingTfAnswer')
     return
   }
   saving.value = true
@@ -216,28 +228,28 @@ async function submitQuestion() {
         answer: qType.value === 'choice' ? multiAnswer.value : answer.value,
         explanation: explanation.value.trim(),
         difficulty: difficulty.value,
-        tags: tagsInput.value.split(/[,，、\s]+/).map((t) => t.trim()).filter(Boolean)
+        tags: tagsInput.value.split(/[,，、\s]+/).map((tag) => tag.trim()).filter(Boolean)
       }
     })
-    saveSuccess.value = '题目已添加。'
+    saveSuccess.value = t('bank.add.success')
     resetForm()
     await loadQuestions()
     await loadBank()
   } catch (err: any) {
-    saveError.value = err?.data?.error?.message || '添加失败，请稍后重试。'
+    saveError.value = apiError(err, 'common.requestFailed')
   } finally {
     saving.value = false
   }
 }
 
 async function removeQuestion(question: BankQuestion) {
-  if (!window.confirm(`确定删除这道题吗？\n${question.stem.slice(0, 40)}`)) return
+  if (!window.confirm(t('bank.list.removeConfirm', { stem: question.stem.slice(0, 40) }))) return
   try {
     await $fetch(`${config.public.apiBase}/banks/${bankId.value}/questions/${question.id}`, { method: 'DELETE', credentials: 'include' })
     questions.value = questions.value.filter((q) => q.id !== question.id)
     bank.value = bank.value ? { ...bank.value, question_count: bank.value.question_count - 1 } : bank.value
   } catch {
-    window.alert('删除失败，请稍后重试。')
+    window.alert(t('bank.list.removeFailed'))
   }
 }
 
@@ -252,7 +264,7 @@ async function loadShareToken() {
 async function publishActivity() {
   publishError.value = ''
   if (!bank.value) return
-  if (bank.value.question_count < 1) { publishError.value = '请先添加至少一道题目，再发布答题活动。'; return }
+  if (bank.value.question_count < 1) { publishError.value = t('bank.share.needQuestion'); return }
   publishing.value = true
   try {
     const created = await $fetch<{ data: { id: string; shareToken: string } }>(`${config.public.apiBase}/activities`, {
@@ -264,7 +276,7 @@ async function publishActivity() {
     activity.value = { id: created.data.id, status: 'published' }
     shareUrl.value = `${window.location.origin}/activity/${created.data.shareToken}`
   } catch (err: any) {
-    publishError.value = err?.data?.error?.message || '发布失败，请稍后重试。'
+    publishError.value = apiError(err, 'common.requestFailed')
   } finally {
     publishing.value = false
   }
@@ -272,13 +284,13 @@ async function publishActivity() {
 
 async function endActivity() {
   if (!activity.value) return
-  if (!window.confirm('确定结束这个答题活动吗？结束后好友将无法继续作答。')) return
+  if (!window.confirm(t('bank.share.endConfirm'))) return
   ending.value = true
   try {
     await $fetch(`${config.public.apiBase}/activities/${activity.value.id}/end`, { method: 'POST', credentials: 'include' })
     activity.value = { ...activity.value, status: 'ended' }
   } catch {
-    window.alert('操作失败，请稍后重试。')
+    window.alert(t('common.requestFailed'))
   } finally {
     ending.value = false
   }
@@ -290,7 +302,7 @@ async function copyLink() {
     copied.value = true
     setTimeout(() => { copied.value = false }, 2000)
   } catch {
-    window.prompt('请手动复制链接：', shareUrl.value)
+    window.prompt(t('bank.share.copyPrompt'), shareUrl.value)
   }
 }
 
@@ -309,177 +321,177 @@ onMounted(async () => {
     <main class="container main">
       <template v-if="ready && !user">
         <div class="panel notice-panel">
-          <h1>请先登录</h1>
-          <p>登录后即可管理题库和题目。</p>
-          <NuxtLink to="/login" class="btn btn-primary">前往登录</NuxtLink>
+          <h1>{{ t('common.needLoginTitle') }}</h1>
+          <p>{{ t('bank.needLoginDesc') }}</p>
+          <NuxtLink to="/login" class="btn btn-primary">{{ t('common.goLogin') }}</NuxtLink>
         </div>
       </template>
 
       <template v-else-if="bankLoading" />
       <template v-else-if="!bank">
         <div class="panel notice-panel">
-          <h1>题库不存在</h1>
-          <p>它可能已被删除，或者不属于当前账号。</p>
-          <NuxtLink to="/banks" class="btn btn-primary">返回我的题库</NuxtLink>
+          <h1>{{ t('bank.notFoundTitle') }}</h1>
+          <p>{{ t('bank.notFoundDesc') }}</p>
+          <NuxtLink to="/banks" class="btn btn-primary">{{ t('bank.backToBanks') }}</NuxtLink>
         </div>
       </template>
 
       <template v-else>
         <div class="bank-head">
           <div>
-            <NuxtLink to="/banks" class="back-link">返回我的题库</NuxtLink>
+            <NuxtLink to="/banks" class="back-link">{{ t('bank.backToBanks') }}</NuxtLink>
             <h1 class="bank-name">{{ bank.name }}</h1>
             <p v-if="bank.description" class="bank-desc">{{ bank.description }}</p>
           </div>
           <div class="head-badges">
-            <span class="badge" :class="bank.visibility === 'public' ? 'is-public' : 'is-draft'">{{ visibilityLabels[bank.visibility] }}</span>
-            <span class="badge is-draft">{{ bank.question_count }} 道题</span>
+            <span class="badge" :class="bank.visibility === 'public' ? 'is-public' : 'is-draft'">{{ bank.visibility === 'public' ? t('visibility.public') : t('visibility.private') }}</span>
+            <span class="badge is-draft">{{ t('bank.questionBadge', { n: bank.question_count }) }}</span>
           </div>
         </div>
 
         <section class="panel share-panel" :class="{ 'is-live': activity && activity.status === 'published' }">
-          <h2 class="panel-title">分享答题</h2>
+          <h2 class="panel-title">{{ t('bank.share.title') }}</h2>
           <template v-if="bank.visibility !== 'public'">
-            <p class="hint">题库当前为<strong>私密</strong>。先在下方「题库设置」中把可见性改为公开，才能发布分享。</p>
+            <p class="hint">{{ t('bank.share.privateHint', { state: t('visibility.private') }) }}</p>
           </template>
           <template v-else-if="activity && activity.status === 'published'">
-            <p class="hint">把下面的链接发给好友，好友打开后输入显示名即可答题，无需注册。</p>
+            <p class="hint">{{ t('bank.share.liveHint') }}</p>
             <div class="share-row">
               <input class="share-link" :value="shareUrl" readonly @focus="($event.target as HTMLInputElement).select()" />
-              <button type="button" class="btn btn-primary btn-sm" @click="copyLink">{{ copied ? '已复制' : '复制链接' }}</button>
-              <button type="button" class="btn btn-secondary btn-sm" :disabled="ending" @click="endActivity">结束活动</button>
-              <button type="button" class="btn btn-secondary btn-sm" :disabled="syncing" title="修改题库题目后，同步到进行中的活动" @click="resyncSnapshot">{{ syncing ? '同步中…' : '同步最新题目' }}</button>
-              <NuxtLink :to="`/activities/${activity.id}/results`" class="btn btn-ghost btn-sm">查看答题情况</NuxtLink>
+              <button type="button" class="btn btn-primary btn-sm" @click="copyLink">{{ copied ? t('bank.share.copied') : t('bank.share.copyLink') }}</button>
+              <button type="button" class="btn btn-secondary btn-sm" :disabled="ending" @click="endActivity">{{ t('bank.share.endActivity') }}</button>
+              <button type="button" class="btn btn-secondary btn-sm" :disabled="syncing" :title="t('bank.share.syncTitle')" @click="resyncSnapshot">{{ syncing ? t('bank.share.syncing') : t('bank.share.syncLatest') }}</button>
+              <NuxtLink :to="`/activities/${activity.id}/results`" class="btn btn-ghost btn-sm">{{ t('bank.share.viewResults') }}</NuxtLink>
             </div>
             <p v-if="syncMessage" class="share-status">{{ syncMessage }}</p>
-            <p class="share-status">活动进行中：好友提交后，点击「查看答题情况」即可看到每人的得分与逐题对错。</p>
+            <p class="share-status">{{ t('bank.share.liveStatus') }}</p>
           </template>
           <template v-else>
-            <p class="hint">{{ activity && activity.status === 'ended' ? '上一个活动已结束，可以发布一个新的分享链接。' : '发布后生成一条分享链接，好友无需注册即可答题。' }}</p>
+            <p class="hint">{{ activity && activity.status === 'ended' ? t('bank.share.endedHint') : t('bank.share.freshHint') }}</p>
             <button type="button" class="btn btn-primary" :disabled="publishing" @click="publishActivity">
-              {{ publishing ? '发布中…' : activity && activity.status === 'ended' ? '重新发布活动' : '发布答题活动' }}
+              {{ publishing ? t('bank.share.publishing') : activity && activity.status === 'ended' ? t('bank.share.republish') : t('bank.share.publish') }}
             </button>
             <p v-if="publishError" class="error">{{ publishError }}</p>
             <p v-if="activity && activity.status === 'ended'" class="share-status">
-              <NuxtLink :to="`/activities/${activity.id}/results`">查看上一个活动的答题情况</NuxtLink>
+              <NuxtLink :to="`/activities/${activity.id}/results`">{{ t('bank.share.viewLastResults') }}</NuxtLink>
             </p>
           </template>
         </section>
 
         <div class="grid">
           <section class="panel">
-            <h2 class="panel-title">添加题目</h2>
-            <div class="type-switch" role="tablist" aria-label="题型">
-              <button type="button" :class="{ active: qType === 'choice' }" @click="switchType('choice')">选择题</button>
-              <button type="button" :class="{ active: qType === 'true_false' }" @click="switchType('true_false')">判断题</button>
+            <h2 class="panel-title">{{ t('bank.add.title') }}</h2>
+            <div class="type-switch" role="tablist" :aria-label="t('question.typesAria')">
+              <button type="button" :class="{ active: qType === 'choice' }" @click="switchType('choice')">{{ t('bank.add.typeChoice') }}</button>
+              <button type="button" :class="{ active: qType === 'true_false' }" @click="switchType('true_false')">{{ t('bank.add.typeTf') }}</button>
             </div>
 
             <form @submit.prevent="submitQuestion">
               <label class="field">
-                题干
-                <textarea v-model="stem" rows="3" maxlength="2000" required placeholder="输入题目内容" />
+                {{ t('bank.add.stem') }}
+                <textarea v-model="stem" rows="3" maxlength="2000" required :placeholder="t('bank.add.stemPlaceholder')" />
               </label>
 
               <template v-if="qType === 'choice'">
                 <div class="options">
                   <div v-for="(opt, i) in optionRows" :key="opt.key" class="option-row">
-                    <label class="answer-check" title="勾选正确答案，勾两个及以上即为多选题">
+                    <label class="answer-check" :title="t('bank.add.checkTitle')">
                       <input type="checkbox" :checked="multiAnswer.includes(opt.key)" @change="toggleMulti(opt.key)" />
                       <span>{{ opt.key.toUpperCase() }}</span>
                     </label>
-                    <input v-model="opt.label" class="option-input" maxlength="200" placeholder="选项内容" />
-                    <button v-if="optionRows.length > 2" type="button" class="option-remove" title="删除选项" @click="removeOption(i)">×</button>
+                    <input v-model="opt.label" class="option-input" maxlength="200" :placeholder="t('bank.add.optionPlaceholder')" />
+                    <button v-if="optionRows.length > 2" type="button" class="option-remove" :title="t('bank.add.removeOption')" @click="removeOption(i)">×</button>
                   </div>
-                  <button v-if="optionRows.length < 6" type="button" class="add-option" @click="addOption">+ 添加选项</button>
-                  <p class="choice-hint">勾选 1 个正确答案为单选题，勾选 2 个及以上为多选题。</p>
+                  <button v-if="optionRows.length < 6" type="button" class="add-option" @click="addOption">{{ t('bank.add.addOption') }}</button>
+                  <p class="choice-hint">{{ t('bank.add.choiceHint') }}</p>
                 </div>
               </template>
 
               <div v-else class="options">
                 <div class="tf-row">
-                  <label class="answer-check"><input type="radio" name="tf" value="true" :checked="answer === 'true'" @change="answer = 'true'" /><span>正确</span></label>
-                  <label class="answer-check"><input type="radio" name="tf" value="false" :checked="answer === 'false'" @change="answer = 'false'" /><span>错误</span></label>
+                  <label class="answer-check"><input type="radio" name="tf" value="true" :checked="answer === 'true'" @change="answer = 'true'" /><span>{{ t('common.optionTrue') }}</span></label>
+                  <label class="answer-check"><input type="radio" name="tf" value="false" :checked="answer === 'false'" @change="answer = 'false'" /><span>{{ t('common.optionFalse') }}</span></label>
                 </div>
               </div>
 
               <label class="field">
-                解析（可选）
-                <textarea v-model="explanation" rows="2" maxlength="2000" placeholder="答题后展示的答案解析" />
+                {{ t('bank.add.explanation') }}
+                <textarea v-model="explanation" rows="2" maxlength="2000" :placeholder="t('bank.add.explanationPlaceholder')" />
               </label>
 
               <div class="row-2">
                 <label class="field">
-                  难度
+                  {{ t('bank.add.difficulty') }}
                   <select v-model.number="difficulty">
-                    <option :value="1">简单</option>
-                    <option :value="2">较易</option>
-                    <option :value="3">中等</option>
-                    <option :value="4">较难</option>
-                    <option :value="5">困难</option>
+                    <option :value="1">{{ t('question.difficulty.d1') }}</option>
+                    <option :value="2">{{ t('question.difficulty.d2') }}</option>
+                    <option :value="3">{{ t('question.difficulty.d3') }}</option>
+                    <option :value="4">{{ t('question.difficulty.d4') }}</option>
+                    <option :value="5">{{ t('question.difficulty.d5') }}</option>
                   </select>
                 </label>
                 <label class="field">
-                  分类标签（用逗号分隔）
-                  <input v-model="tagsInput" maxlength="120" placeholder="例如：力学, 浮力" />
+                  {{ t('bank.add.tags') }}
+                  <input v-model="tagsInput" maxlength="120" :placeholder="t('bank.add.tagsPlaceholder')" />
                 </label>
               </div>
 
               <p v-if="saveError" class="error">{{ saveError }}</p>
               <p v-if="saveSuccess" class="success">{{ saveSuccess }}</p>
               <button type="submit" class="btn btn-primary btn-block" :disabled="saving">
-                {{ saving ? '保存中…' : '添加题目' }}
+                {{ saving ? t('bank.add.saving') : t('bank.add.submit') }}
               </button>
             </form>
           </section>
 
           <section class="panel">
-            <h2 class="panel-title">题目列表</h2>
-            <p v-if="listLoading" class="hint">加载中…</p>
+            <h2 class="panel-title">{{ t('bank.list.title') }}</h2>
+            <p v-if="listLoading" class="hint">{{ t('common.loading') }}</p>
             <p v-else-if="listError" class="error">{{ listError }}</p>
-            <p v-else-if="!questions.length" class="hint">还没有题目。在左侧添加第一道题，之后就可以发布答题活动。</p>
+            <p v-else-if="!questions.length" class="hint">{{ t('bank.list.empty') }}</p>
             <ul v-else class="q-list">
               <li v-for="(q, i) in questions" :key="q.id" class="q-item">
                 <div class="q-main">
                   <div class="q-top">
                     <span class="q-index">{{ i + 1 }}</span>
-                    <span class="q-type">{{ typeLabels[q.type] }}</span>
+                    <span class="q-type">{{ typeLabel(q.type) }}</span>
                     <span v-for="tag in q.tags" :key="tag" class="tag">{{ tag }}</span>
-                    <span class="q-diff">{{ difficultyLabels[q.difficulty] ?? '中等' }}</span>
+                    <span class="q-diff">{{ difficultyLabel(q.difficulty) }}</span>
                   </div>
                   <p class="q-stem">{{ q.stem }}</p>
-                  <p class="q-answer">正确答案：{{ answerText(q) }}</p>
+                  <p class="q-answer">{{ t('question.answerPrefix') }}{{ answerText(q) }}</p>
                   <p v-if="q.explanation" class="q-explain">{{ q.explanation }}</p>
                 </div>
-                <button type="button" class="q-delete" title="删除题目" @click="removeQuestion(q)">删除</button>
+                <button type="button" class="q-delete" :title="t('bank.list.removeTitle')" @click="removeQuestion(q)">{{ t('bank.list.remove') }}</button>
               </li>
             </ul>
           </section>
         </div>
 
         <section class="panel settings-panel">
-          <h2 class="panel-title">题库设置</h2>
+          <h2 class="panel-title">{{ t('bank.settings.title') }}</h2>
           <form @submit.prevent="saveSettings">
             <div class="row-2">
               <label class="field">
-                题库名称
+                {{ t('bank.settings.name') }}
                 <input v-model="settingName" maxlength="100" required />
               </label>
               <label class="field">
-                可见性（是否可分享）
+                {{ t('bank.settings.visibility') }}
                 <select v-model="settingVisibility">
-                  <option value="private">私密（仅自己可见）</option>
-                  <option value="public">公开（可被分享访问）</option>
+                  <option value="private">{{ t('banks.create.visPrivate') }}</option>
+                  <option value="public">{{ t('banks.create.visPublic') }}</option>
                 </select>
               </label>
             </div>
             <label class="field">
-              描述
-              <textarea v-model="settingDescription" rows="2" maxlength="500" placeholder="简要说明这个题库的用途" />
+              {{ t('bank.settings.description') }}
+              <textarea v-model="settingDescription" rows="2" maxlength="500" :placeholder="t('bank.settings.descriptionPlaceholder')" />
             </label>
             <p v-if="settingsError" class="error">{{ settingsError }}</p>
             <p v-if="settingsSuccess" class="success">{{ settingsSuccess }}</p>
             <button type="submit" class="btn btn-primary settings-save" :disabled="savingSettings">
-              {{ savingSettings ? '保存中…' : '保存设置' }}
+              {{ savingSettings ? t('bank.settings.saving') : t('bank.settings.submit') }}
             </button>
           </form>
         </section>

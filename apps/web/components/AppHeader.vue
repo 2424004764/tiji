@@ -1,20 +1,22 @@
 <script setup lang="ts">
+const { t } = useI18n()
 const { user, logout } = useAuth()
 </script>
 
 <template>
   <header class="nav">
     <div class="nav-inner">
-      <NuxtLink to="/" class="brand" aria-label="题迹首页"><AppLogo /></NuxtLink>
-      <nav class="nav-links" aria-label="页面导航">
-        <NuxtLink to="/#how" class="hide-sm">如何运作</NuxtLink>
-        <NuxtLink to="/#features" class="hide-sm">功能</NuxtLink>
-        <NuxtLink v-if="user" to="/banks">我的题库</NuxtLink>
+      <NuxtLink to="/" class="brand" :aria-label="t('nav.homeAria')"><AppLogo /></NuxtLink>
+      <nav class="nav-links" :aria-label="t('nav.primaryAria')">
+        <NuxtLink to="/#how" class="hide-sm">{{ t('nav.how') }}</NuxtLink>
+        <NuxtLink to="/#features" class="hide-sm">{{ t('nav.features') }}</NuxtLink>
+        <NuxtLink v-if="user" to="/banks">{{ t('nav.myBanks') }}</NuxtLink>
       </nav>
-      <NuxtLink v-if="!user" to="/login" class="btn btn-ghost btn-sm">登录</NuxtLink>
+      <LocaleSwitch class="nav-locale" />
+      <NuxtLink v-if="!user" to="/login" class="btn btn-ghost btn-sm">{{ t('nav.login') }}</NuxtLink>
       <template v-else>
         <span class="nav-user">{{ user.username }}</span>
-        <button type="button" class="btn btn-ghost btn-sm" @click="logout">退出</button>
+        <button type="button" class="btn btn-ghost btn-sm" @click="logout">{{ t('nav.logout') }}</button>
       </template>
     </div>
   </header>
@@ -33,6 +35,7 @@ const { user, logout } = useAuth()
 .nav-links { display: flex; gap: 26px; margin-right: auto; min-width: 0; }
 .nav-links a { color: var(--muted); text-decoration: none; font-size: 14.5px; white-space: nowrap; transition: color 0.15s ease; }
 .nav-links a:hover { color: var(--ink); }
+.nav-locale { margin-right: -6px; }
 .nav-user { font-size: 14px; font-weight: 600; color: var(--ink); white-space: nowrap; }
 @media (max-width: 640px) {
   .nav-inner { padding: 0 16px; height: 56px; gap: 14px; }
