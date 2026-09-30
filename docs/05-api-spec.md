@@ -6,9 +6,17 @@ Base URL：`/api/v1`。成功响应：`{ "data": ..., "error": null, "meta": {} 
 
 - `POST /auth/register`：`{ username, password }` -> 用户摘要并建立 session。
 - `POST /auth/login`：登录并建立 session。
-- `POST /auth/logout`：撤销当前 session。
+- `POST /auth/logout`：撤销当前 session；若用户绑定过工具箱账号，顺带向工具站撤销其 OAuth 令牌（尽力而为）。
 - `GET /auth/me`：返回当前用户。
 - `PATCH /auth/password`：修改密码并撤销其他 session。
+
+### 工具站 OAuth2 登录（授权码模式）
+
+工具站（工具箱）作为授权服务器，本站作为客户端。配置 `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET`（Worker secret）后启用；回调地址 `<API 域名>/api/v1/auth/oauth/callback` 需加入工具站应用白名单。
+
+- `GET /auth/oauth/status`：返回 `{ enabled }`，前端据此显示/隐藏「使用工具箱账号登录」。
+- `GET /auth/oauth/start?redirect=/banks`：生成防 CSRF 的 `state` 存入短效 HttpOnly Cookie，302 跳转工具站授权页。
+- `GET /auth/oauth/callback`：校验 `state` -> 授权码换令牌 -> 拉取 userinfo -> 以 `sub` 查 `oauth_accounts` 映射本地账号（首次自动注册，无密码）-> 建立本站 session -> 302 回 Web 端。用户拒绝或任一步失败时回登录页并带 `oauth_error` 参数（`access_denied` / `invalid_state` / `token_exchange` / `userinfo_failed` / `account_disabled` / `not_configured` / `failed`）。
 
 ## 题库与题目
 

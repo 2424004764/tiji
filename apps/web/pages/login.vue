@@ -7,6 +7,7 @@ useSeoMeta({
 })
 
 const config = useRuntimeConfig()
+const route = useRoute()
 const { user, ready, setAuthenticated, logout } = useAuth()
 const { apiError } = useI18n()
 const mode = ref<'login' | 'register'>('login')
@@ -14,6 +15,22 @@ const username = ref('')
 const password = ref('')
 const loading = ref(false)
 const error = ref('')
+
+// 工具站 OAuth2 登录：入口是否可用由 API 配置决定（client_id/secret 未配置则隐藏）
+const oauthEnabled = ref(false)
+const oauthErrorCodes = ['access_denied', 'invalid_state', 'token_exchange', 'userinfo_failed', 'account_disabled', 'not_configured', 'failed'] as const
+const oauthError = computed(() => {
+  const code = route.query.oauth_error
+  return typeof code === 'string' && (oauthErrorCodes as readonly string[]).includes(code)
+    ? t(`login.oauth.errors.${code}` as Parameters<typeof t>[0])
+    : ''
+})
+const oauthStartUrl = computed(() => `${config.public.apiBase}/auth/oauth/start?redirect=/banks`)
+onMounted(() => {
+  $fetch<{ data: { enabled: boolean } }>(`${config.public.apiBase}/auth/oauth/status`)
+    .then((res) => { oauthEnabled.value = !!res.data?.enabled })
+    .catch(() => { /* 拉取失败时隐藏工具箱入口 */ })
+})
 
 async function submit() {
   error.value = ''
@@ -61,6 +78,7 @@ function switchMode(next: 'login' | 'register') {
       </template>
 
       <template v-else>
+        <p v-if="oauthError" class="error oauth-error">{{ oauthError }}</p>
         <div class="tabs" role="tablist" :aria-label="t('login.tabsAria')">
           <button type="button" role="tab" :aria-selected="mode === 'login'" :class="{ active: mode === 'login' }" @click="switchMode('login')">{{ t('login.tabLogin') }}</button>
           <button type="button" role="tab" :aria-selected="mode === 'register'" :class="{ active: mode === 'register' }" @click="switchMode('register')">{{ t('login.tabRegister') }}</button>
@@ -81,6 +99,11 @@ function switchMode(next: 'login' | 'register') {
             {{ loading ? t('login.submitting') : mode === 'login' ? t('login.submitLogin') : t('login.submitRegister') }}
           </button>
         </form>
+
+        <template v-if="oauthEnabled">
+          <div class="oauth-divider"><span>{{ t('login.oauth.divider') }}</span></div>
+          <a class="btn btn-secondary btn-block" :href="oauthStartUrl">{{ t('login.oauth.button') }}</a>
+        </template>
       </template>
     </div>
   </div>
@@ -116,6 +139,9 @@ function switchMode(next: 'login' | 'register') {
 form { display: grid; gap: 16px; margin-top: 4px; }
 .btn-block { margin-top: 6px; }
 .btn-block + .btn-block { margin-top: 10px; }
+.oauth-error { margin: 0 0 14px; }
+.oauth-divider { display: flex; align-items: center; gap: 12px; margin: 18px 0 4px; color: var(--muted); font-size: 13px; }
+.oauth-divider::before, .oauth-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .logged-hint { margin: 4px 0 22px; font-size: 15px; line-height: 1.7; color: var(--ink); }
 .logged-actions { display: grid; }
 @media (max-width: 640px) {

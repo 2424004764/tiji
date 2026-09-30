@@ -21,7 +21,7 @@ Browser / mobile browser / future clients
 
 ## API 约定
 
-API 前缀为 `/api/v1`，统一返回 `{ data, error, meta }`。认证采用 HttpOnly session cookie。公开活动使用高熵 token；服务端按活动状态过滤字段。所有写请求校验 JSON schema，列表接口使用 cursor 分页。
+API 前缀为 `/api/v1`，统一返回 `{ data, error, meta }`。认证采用 HttpOnly session cookie，并支持工具站 OAuth2 授权码登录（本站作为客户端，`state` 校验与 `client_secret` 只存 Worker 侧，以提供方 `sub` 映射本地账号）。公开活动使用高熵 token；服务端按活动状态过滤字段。所有写请求校验 JSON schema，列表接口使用 cursor 分页。
 
 ## Cloudflare 环境
 

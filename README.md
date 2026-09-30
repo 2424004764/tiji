@@ -26,7 +26,7 @@
 - 交互与 SEO Web：Nuxt 3、Vue 3、TypeScript、Pinia
 - 界面语言：`zh-CN` / `en-US` 中英文可切换（见下方「多语言支持」）
 - 首期题型：选择题（勾 1 个答案为单选，勾 2 个及以上为多选）与判断题
-- 登录：用户名 + 密码；答题者不强制注册
+- 登录：用户名 + 密码，或工具站「工具箱」OAuth2 单点登录（授权码模式，见 `docs/05-api-spec.md`）；答题者不强制注册
 
 ## 多语言支持（中文 / 英文）
 
@@ -192,6 +192,15 @@ pnpm --filter @tiji/api exec wrangler deploy
 ```
 
 生产部署前需要确认 `apps/api/wrangler.toml` 中的 `database_id`、域名、CORS、密钥和环境配置均已替换为正式值。统一 Web 端应构建并部署到 Cloudflare Pages 或其他支持 Nuxt 的托管服务。
+
+启用工具箱 OAuth2 登录：在工具站管理后台「系统 → OAuth 应用」新建应用，回调地址填 `https://<API 域名>/api/v1/auth/oauth/callback`，然后在 API 侧配置：
+
+```bash
+# apps/api/wrangler.toml 的 [vars] 里填 OAUTH_CLIENT_ID，再执行：
+pnpm --filter @tiji/api exec wrangler secret put OAUTH_CLIENT_SECRET
+```
+
+不配置时登录页自动隐藏工具箱入口，仅保留用户名密码登录。
 
 ## 当前开发状态
 

@@ -4,6 +4,8 @@
 
 密码只保存为带随机 salt 的强哈希；session token 只保存哈希值，Cookie 使用 HttpOnly、Secure、SameSite=Lax，并设置合理过期时间。登录、注册和密码修改均限速；错误提示不区分用户名不存在还是密码错误。
 
+OAuth2 工具站登录采用授权码模式：`state` 随机生成、HttpOnly 短效 Cookie 保存、回调时强校验；`client_secret` 只存 Worker secret，绝不下发浏览器；本地账号以提供方 `sub` 唯一映射，提供方用户名清洗查重后落库；OAuth 账号不设密码（密码哈希为空串，任何密码校验都不通过）。
+
 ## 授权
 
 每个私有资源查询都从 session 用户推导 owner，不信任客户端传入的 owner_id。活动结果仅活动创建者可见。答题者使用活动内匿名标识和显示名，不建立跨活动用户画像。

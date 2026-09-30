@@ -128,7 +128,20 @@ const zhCN = {
     loggedHint: '当前已登录为 {name}，无需再次登录。',
     goBanks: '我的题库',
     goHome: '进入首页',
-    logout: '退出登录'
+    logout: '退出登录',
+    oauth: {
+      divider: '或',
+      button: '使用工具箱账号登录',
+      errors: {
+        access_denied: '你取消了工具箱授权，未完成登录。',
+        invalid_state: '登录状态校验失败，请重新发起登录。',
+        token_exchange: '工具箱授权失败，请稍后重试。',
+        userinfo_failed: '获取工具箱用户信息失败，请稍后重试。',
+        account_disabled: '该账号已被禁用，无法登录。',
+        not_configured: '工具箱登录暂未配置，请联系管理员。',
+        failed: '工具箱登录失败，请稍后重试。'
+      }
+    }
   },
   banks: {
     seo: { title: '我的题库 · 题迹', description: '创建和管理你的题库。' },
@@ -453,7 +466,20 @@ const enUS: MessageSchema = {
     loggedHint: 'You are already logged in as {name}. No need to log in again.',
     goBanks: 'My banks',
     goHome: 'Go to home',
-    logout: 'Log out'
+    logout: 'Log out',
+    oauth: {
+      divider: 'or',
+      button: 'Continue with your Toolbox account',
+      errors: {
+        access_denied: 'You cancelled the Toolbox authorization, so the login was not completed.',
+        invalid_state: 'Login state verification failed. Please start the login again.',
+        token_exchange: 'Toolbox authorization failed. Please try again later.',
+        userinfo_failed: 'Failed to load your Toolbox profile. Please try again later.',
+        account_disabled: 'This account has been disabled and cannot log in.',
+        not_configured: 'Toolbox login is not configured yet. Please contact the administrator.',
+        failed: 'Toolbox login failed. Please try again later.'
+      }
+    }
   },
   banks: {
     seo: { title: 'My banks · Tiji', description: 'Create and manage your question banks.' },

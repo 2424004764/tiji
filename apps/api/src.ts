@@ -3,7 +3,7 @@ import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 
-export type Env = { Bindings: { DB: D1Database; APP_ENV?: string; PUBLIC_APP_URL?: string } }
+export type Env = { Bindings: { DB: D1Database; APP_ENV?: string; PUBLIC_APP_URL?: string; OAUTH_PROVIDER_URL?: string; OAUTH_CLIENT_ID?: string; OAUTH_CLIENT_SECRET?: string } }
 type User = { id: string; username: string; locale: string; timezone: string }
 
 const app = new Hono<Env>().basePath('/api/v1')
@@ -88,6 +88,60 @@ async function createSession(c: any, userId: string) {
   setCookie(c, SESSION_COOKIE, token, { httpOnly: true, secure: true, sameSite: isLocalOrigin(new URL(c.req.url).origin) ? 'Lax' : 'None', path: '/', maxAge: SESSION_DAYS * 86400 })
 }
 
+// ---- 工具站 OAuth2 登录（子站作为客户端，标准授权码流程） ----
+const OAUTH_PROVIDER = 'toolbox'
+const OAUTH_STATE_COOKIE = 'tiji_oauth_state'
+const OAUTH_STATE_SECONDS = 600
+type OAuthConfig = { providerUrl: string; clientId: string; clientSecret: string }
+
+// client_id/client_secret 配齐才启用工具箱登录；secret 用 `wrangler secret put OAUTH_CLIENT_SECRET` 下发
+const oauthConfig = (c: any): OAuthConfig | null =>
+  c.env?.OAUTH_CLIENT_ID && c.env?.OAUTH_CLIENT_SECRET
+    ? { providerUrl: String(c.env.OAUTH_PROVIDER_URL || 'https://tool.fologde.com').replace(/\/+$/, ''), clientId: String(c.env.OAUTH_CLIENT_ID), clientSecret: String(c.env.OAUTH_CLIENT_SECRET) }
+    : null
+const oauthRedirectUri = (c: any) => `${new URL(c.req.url).origin}/api/v1/auth/oauth/callback`
+
+// 回跳 Web 端地址：优先取发起跳转时的 Referer/Origin（限 CORS 白名单或本地地址），
+// 避免把用户送去任意域名；取不到时回退 PUBLIC_APP_URL 第一项
+function oauthWebOrigin(c: any): string {
+  for (const header of ['referer', 'origin']) {
+    const raw = c.req.header(header)
+    if (!raw) continue
+    try {
+      const origin = new URL(raw).origin
+      if (isLocalOrigin(origin) || allowedOrigins(c).includes(origin)) return origin
+    } catch { /* 非 URL 头，忽略 */ }
+  }
+  return allowedOrigins(c)[0] ?? new URL(c.req.url).origin
+}
+
+type OAuthState = { state: string; redirect: string; origin: string }
+const encodeOAuthState = (value: OAuthState) => base64url(new TextEncoder().encode(JSON.stringify(value)))
+const decodeOAuthState = (raw: string | undefined): OAuthState | null => {
+  if (!raw) return null
+  try {
+    const bytes = Uint8Array.from(atob(raw.replace(/-/g, '+').replace(/_/g, '/')), (ch) => ch.charCodeAt(0))
+    const value = JSON.parse(new TextDecoder().decode(bytes))
+    return value && typeof value.state === 'string' && typeof value.redirect === 'string' && typeof value.origin === 'string' ? value : null
+  } catch { return null }
+}
+
+// 仅允许站内路径（拦截 // 与 /\ 开头的协议相对地址），防止开放重定向
+const oauthRedirectTarget = (value: unknown) => (typeof value === 'string' && /^\/[^/\\]/.test(value) ? value.slice(0, 200) : '/banks')
+
+// 工具站用户名不一定满足本站规则：清洗后查重，冲突时追加序号
+async function oauthAvailableUsername(c: any, info: any) {
+  const sources = [info?.username, typeof info?.email === 'string' ? info.email.split('@')[0] : '']
+  const source = sources.find((v) => typeof v === 'string' && v.replace(/[^\w-]/g, '').length >= 3) ?? ''
+  const preferred = source ? source.replace(/[^\w-]/g, '').slice(0, 24) : `user_${randomToken(4)}`
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const candidate = attempt === 0 ? preferred : `${preferred.slice(0, 28)}-${attempt + 1}`
+    const taken = await c.env.DB.prepare('SELECT id FROM users WHERE username=?').bind(candidate).first()
+    if (!taken) return candidate
+  }
+  return `user_${randomToken(6)}`
+}
+
 app.get('/health', (c) => json(c, { ok: true, service: 'tiji-api' }))
 app.post('/auth/register', async (c) => {
   const body = await parseBody(c); const username = cleanUsername(body?.username); const password = typeof body?.password === 'string' ? body.password : ''
@@ -104,8 +158,90 @@ app.post('/auth/login', async (c) => {
   if (!user || !(await verifyPassword(password, user.password_hash))) return fail(c, 'INVALID_CREDENTIALS', '用户名或密码错误', 401)
   await createSession(c, user.id); return json(c, { id: user.id, username: user.username, locale: user.locale, timezone: user.timezone })
 })
-app.post('/auth/logout', async (c) => { const token = getCookie(c, SESSION_COOKIE); if (token) await c.env.DB.prepare('UPDATE sessions SET revoked_at=? WHERE token_hash=?').bind(now(), await sha256(token)).run(); deleteCookie(c, SESSION_COOKIE, { path: '/' }); return json(c, { ok: true }) })
+app.post('/auth/logout', async (c) => {
+  const token = getCookie(c, SESSION_COOKIE)
+  if (token) {
+    const tokenHash = await sha256(token)
+    const linked = await c.env.DB.prepare('SELECT s.user_id,o.refresh_token FROM sessions s JOIN oauth_accounts o ON o.user_id=s.user_id AND o.provider=? WHERE s.token_hash=? AND s.revoked_at IS NULL').bind(OAUTH_PROVIDER, tokenHash).first() as any
+    await c.env.DB.prepare('UPDATE sessions SET revoked_at=? WHERE token_hash=?').bind(now(), tokenHash).run()
+    // 登出时顺带撤销工具站的令牌（尽力而为，失败不阻断本站登出）
+    const config = oauthConfig(c)
+    if (linked?.refresh_token && config) {
+      try {
+        await fetch(`${config.providerUrl}/api/oauth/revoke`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token: linked.refresh_token, client_id: config.clientId, client_secret: config.clientSecret }) })
+      } catch (err) { console.error('[api] oauth revoke failed:', err) }
+      await c.env.DB.prepare('UPDATE oauth_accounts SET access_token=NULL,refresh_token=NULL,access_token_expires_at=NULL,updated_at=? WHERE provider=? AND user_id=?').bind(now(), OAUTH_PROVIDER, linked.user_id).run()
+    }
+  }
+  deleteCookie(c, SESSION_COOKIE, { path: '/' })
+  return json(c, { ok: true })
+})
 app.get('/auth/me', async (c) => { const user = await currentUser(c); return user ? json(c, user) : fail(c, 'AUTH_REQUIRED', '请先登录', 401) })
+
+app.get('/auth/oauth/status', (c) => json(c, { enabled: !!oauthConfig(c) }))
+
+// 生成防 CSRF 的 state 存入短效 Cookie，302 跳转工具站授权页
+app.get('/auth/oauth/start', (c) => {
+  const config = oauthConfig(c)
+  const origin = oauthWebOrigin(c)
+  if (!config) return c.redirect(`${origin}/login?oauth_error=not_configured`)
+  const state = randomToken(16)
+  setCookie(c, OAUTH_STATE_COOKIE, encodeOAuthState({ state, redirect: oauthRedirectTarget(c.req.query('redirect')), origin }), { httpOnly: true, secure: true, sameSite: 'Lax', path: '/api/v1/auth/oauth', maxAge: OAUTH_STATE_SECONDS })
+  const authorize = new URL(`${config.providerUrl}/oauth/authorize`)
+  authorize.searchParams.set('client_id', config.clientId)
+  authorize.searchParams.set('redirect_uri', oauthRedirectUri(c))
+  authorize.searchParams.set('state', state)
+  return c.redirect(authorize.toString())
+})
+
+// 授权码回调：校验 state -> 换令牌 -> 拉用户资料 -> 以 sub 映射本地账号 -> 建会话 -> 回 Web 端
+app.get('/auth/oauth/callback', async (c) => {
+  const config = oauthConfig(c)
+  const oauthState = decodeOAuthState(getCookie(c, OAUTH_STATE_COOKIE))
+  deleteCookie(c, OAUTH_STATE_COOKIE, { path: '/api/v1/auth/oauth' })
+  const backToLogin = (errorCode: string) => c.redirect(`${oauthState?.origin ?? oauthWebOrigin(c)}/login?oauth_error=${errorCode}`)
+  if (!config) return backToLogin('not_configured')
+  if (!oauthState || !c.req.query('state') || c.req.query('state') !== oauthState.state) return backToLogin('invalid_state')
+  if (c.req.query('error')) return backToLogin(c.req.query('error') === 'access_denied' ? 'access_denied' : 'failed')
+  const code = c.req.query('code')
+  if (!code) return backToLogin('failed')
+
+  const exchange = await fetch(`${config.providerUrl}/api/oauth/token`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: oauthRedirectUri(c), client_id: config.clientId, client_secret: config.clientSecret })
+  })
+  const token = exchange.ok ? await exchange.json().catch(() => null) as any : null
+  if (!token?.access_token) { console.error('[api] oauth token exchange failed:', exchange.status); return backToLogin('token_exchange') }
+
+  const infoRes = await fetch(`${config.providerUrl}/api/oauth/userinfo`, { headers: { authorization: `Bearer ${token.access_token}` } })
+  const info = infoRes.ok ? await infoRes.json().catch(() => null) as any : null
+  const providerUserId = info?.sub != null ? String(info.sub) : ''
+  if (!providerUserId) { console.error('[api] oauth userinfo failed:', infoRes.status); return backToLogin('userinfo_failed') }
+
+  const link = await c.env.DB.prepare('SELECT user_id FROM oauth_accounts WHERE provider=? AND provider_user_id=?').bind(OAUTH_PROVIDER, providerUserId).first() as any
+  let userId = link?.user_id as string | undefined
+  if (userId) {
+    const user = await c.env.DB.prepare('SELECT id FROM users WHERE id=? AND status=\'active\'').bind(userId).first()
+    if (!user) return backToLogin('account_disabled')
+  } else {
+    // 首次登录自动注册：无密码（password_hash 存空串，verifyPassword 对其恒为 false）
+    const timestamp = now()
+    userId = id()
+    const username = await oauthAvailableUsername(c, info)
+    const expiresAt = Number(token.expires_in) > 0 ? new Date(Date.now() + Number(token.expires_in) * 1000).toISOString() : null
+    await c.env.DB.batch([
+      c.env.DB.prepare('INSERT INTO users(id,username,password_hash,created_at,updated_at) VALUES(?,?,?,?,?)').bind(userId, username, '', timestamp, timestamp),
+      c.env.DB.prepare('INSERT INTO oauth_accounts(provider,provider_user_id,user_id,profile_json,access_token,refresh_token,access_token_expires_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(
+        OAUTH_PROVIDER, providerUserId, userId,
+        JSON.stringify({ username: info.username ?? null, email: info.email ?? null, avatar: info.avatar ?? null }),
+        token.access_token, typeof token.refresh_token === 'string' ? token.refresh_token : null, expiresAt, timestamp, timestamp)
+    ])
+  }
+
+  await createSession(c, userId)
+  return c.redirect(`${oauthState.origin}${oauthState.redirect}`)
+})
 
 app.get('/banks', async (c) => { const user = await requireUser(c); if (typeof user !== 'object') return user; const rows = await c.env.DB.prepare('SELECT b.id,b.name,b.description,b.visibility,b.status,b.created_at,b.updated_at,(SELECT COUNT(*) FROM bank_questions bq JOIN questions q ON q.id=bq.question_id AND q.deleted_at IS NULL WHERE bq.bank_id=b.id) AS question_count,(SELECT json_object(\'id\',a.id,\'status\',a.status) FROM activities a WHERE a.bank_id=b.id ORDER BY a.created_at DESC LIMIT 1) AS activity FROM question_banks b WHERE b.owner_id=? AND b.deleted_at IS NULL ORDER BY b.updated_at DESC').bind(user.id).all(); return json(c, rows.results) })
 app.post('/banks', async (c) => { const user = await requireUser(c); if (typeof user !== 'object') return user; const body = await parseBody(c); const name = typeof body?.name === 'string' ? body.name.trim() : ''; if (!name || name.length > 100) return fail(c, 'VALIDATION_ERROR', '题库名称不能为空且不能超过 100 字', 400); const bankId = id(); const timestamp = now(); await c.env.DB.prepare('INSERT INTO question_banks(id,owner_id,name,description,visibility,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').bind(bankId,user.id,name,typeof body.description === 'string' ? body.description.slice(0,500) : '',body.visibility === 'public' ? 'public' : 'private',timestamp,timestamp).run(); return json(c,{ id: bankId, name },201) })

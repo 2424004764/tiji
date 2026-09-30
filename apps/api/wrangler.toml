@@ -10,6 +10,16 @@ port = 8799
 # 前端部署到 Pages 后，把实际域名填进来（如 "https://tiji.pages.dev"），再执行 wrangler deploy 生效
 PUBLIC_APP_URL = "https://tiji.fologde.com,https://tiji.pages.dev"
 
+# 工具站 OAuth2 登录（子站作为客户端，授权服务器见工具站《子站统一登录接入指南》）
+# 在工具站管理后台「系统 → OAuth 应用」创建应用，回调地址白名单填：
+#   https://<本 API 域名>/api/v1/auth/oauth/callback
+# 本地开发对应 http://localhost:8799/api/v1/auth/oauth/callback
+# client_id/client_secret 留空则登录页不显示「工具箱账号登录」入口
+OAUTH_PROVIDER_URL = "https://tool.fologde.com"
+OAUTH_CLIENT_ID = "tc_8fe805baa38fc4e3"
+# client_secret 属敏感信息，不入库；用 wrangler secret put OAUTH_CLIENT_SECRET 配置
+# 本地开发写入 apps/api/.dev.vars：OAUTH_CLIENT_SECRET=...
+
 [[d1_databases]]
 binding = "DB"
 database_name = "tiji-db"

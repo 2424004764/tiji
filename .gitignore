@@ -28,6 +28,9 @@ pnpm-debug.log*
 !.env.development
 !.env.production
 
+# Wrangler local secrets（如 OAUTH_CLIENT_SECRET）
+.dev.vars
+
 # Editor & OS
 .idea/
 .vscode/

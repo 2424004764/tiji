@@ -6,6 +6,7 @@
 
 - `users(id, username UNIQUE, password_hash, status, locale, timezone, created_at, updated_at)`
 - `sessions(id, user_id, token_hash UNIQUE, expires_at, revoked_at, last_seen_at, created_at)`
+- `oauth_accounts(provider, provider_user_id, user_id, profile_json, access_token, refresh_token, access_token_expires_at, created_at, updated_at, PRIMARY KEY(provider, provider_user_id))`
 - `question_banks(id, owner_id, name, description, visibility, status, created_at, updated_at, deleted_at)`
 - `questions(id, owner_id, type, stem, options_json, answer_json, explanation, difficulty, tags_json, version, created_at, updated_at, deleted_at)`
 - `bank_questions(bank_id, question_id, position, created_at, PRIMARY KEY(bank_id, question_id))`
