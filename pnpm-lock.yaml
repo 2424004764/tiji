@@ -38,9 +38,15 @@ importers:
       pinia:
         specifier: ^2.3.0
         version: 2.3.1(typescript@5.9.3)(vue@3.5.42(typescript@5.9.3))
+      posthog-js:
+        specifier: ^1.434.18
+        version: 1.434.18
       vue:
         specifier: ^3.5.13
         version: 3.5.42(typescript@5.9.3)
+      xlsx:
+        specifier: ^0.18.5
+        version: 0.18.5
     devDependencies:
       typescript:
         specifier: ^5.7.2
@@ -1209,6 +1215,15 @@ packages:
   '@poppinss/exception@1.2.3':
     resolution: {integrity: sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw==, tarball: https://registry.npmmirror.com/@poppinss/exception/-/exception-1.2.3.tgz}
 
+  '@posthog/browser-common@0.9.0':
+    resolution: {integrity: sha512-EWoVzs1vVY7ihpn8yOjj3jyjriHUEEMVSBNL/TW3hk09fTriWRe76vJXrRg0G0yjTYxHmtlSkNn4mOV24ZEzzA==, tarball: https://registry.npmmirror.com/@posthog/browser-common/-/browser-common-0.9.0.tgz}
+
+  '@posthog/core@1.55.2':
+    resolution: {integrity: sha512-2mYxGbDmTLUs096VbcZqSWo0lrI48/BrX65r54NynxxFq409BOx9w73HxOAtOKZ1vblkdV6/GxQTe7KDcIQidg==, tarball: https://registry.npmmirror.com/@posthog/core/-/core-1.55.2.tgz}
+
+  '@posthog/types@1.412.4':
+    resolution: {integrity: sha512-Q7lV9O9TbLngjOYw1ucm3bS3tn48xb1B4ZQdDy8gv7yfKe99hCTeWYG4xZ36nJM80VxpTF9TriiJt5hngDOkBg==, tarball: https://registry.npmmirror.com/@posthog/types/-/types-1.412.4.tgz}
+
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==, tarball: https://registry.npmmirror.com/@rolldown/pluginutils/-/pluginutils-1.0.1.tgz}
 
@@ -1445,6 +1460,9 @@ packages:
   '@types/resolve@1.20.2':
     resolution: {integrity: sha512-60BCwRFOZCQhDncwQdxxeOEEkbc5dIMccYLwbxsS4TUNeVECQ/pBJ0j09mrHOl/JJvpRPGwO9SvE4nR2Nb/a4Q==, tarball: https://registry.npmmirror.com/@types/resolve/-/resolve-1.20.2.tgz}
 
+  '@types/trusted-types@2.0.7':
+    resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==, tarball: https://registry.npmmirror.com/@types/trusted-types/-/trusted-types-2.0.7.tgz}
+
   '@unhead/vue@2.1.17':
     resolution: {integrity: sha512-pnC8x9HLV3qQXdvWfylUEU25uhfCAy3ly9nmpQz84j9py818DRfU8jOsQ5wjdWtxyU1vX/fW2udfm4jtxUK8Bg==, tarball: https://registry.npmmirror.com/@unhead/vue/-/vue-2.1.17.tgz}
     peerDependencies:
@@ -1590,6 +1608,10 @@ packages:
     resolution: {integrity: sha512-lGq+9yr1/GuAWaVYIHRjvvySG5/4VfKIvC8EWxStPdcDh/Ka7FG3twP6v4d5BkravUilhIAsG4Qj83t02LWUPQ==, tarball: https://registry.npmmirror.com/acorn/-/acorn-8.18.0.tgz}
     engines: {node: '>=0.4.0'}
     hasBin: true
+
+  adler-32@1.3.1:
+    resolution: {integrity: sha512-ynZ4w/nUUv5rrsR8UUGoe1VC9hZj6V5hU9Qw1HlMDJGEJw5S7TfTErWTjMys6M7vr0YWcPqs3qAr4ss0nDfP+A==, tarball: https://registry.npmmirror.com/adler-32/-/adler-32-1.3.1.tgz}
+    engines: {node: '>=0.8'}
 
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==, tarball: https://registry.npmmirror.com/agent-base/-/agent-base-7.1.4.tgz}
@@ -1784,6 +1806,10 @@ packages:
   caniuse-lite@1.0.30001810:
     resolution: {integrity: sha512-TITQPUkaz+aVk5GL6NhOdwk1aEaNTSDPsGFWrTuhKGtjTF70jL/Oht2W4c6rXUe5fu7Ie19VIahAXHIIiWWNeg==, tarball: https://registry.npmmirror.com/caniuse-lite/-/caniuse-lite-1.0.30001810.tgz}
 
+  cfb@1.2.2:
+    resolution: {integrity: sha512-KfdUZsSOw19/ObEWasvBP/Ac4reZvAGauZhs6S/gqNhXhI7cKwvlH7ulj+dOEYnca4bm4SGo8C1bTAQvnTjgQA==, tarball: https://registry.npmmirror.com/cfb/-/cfb-1.2.2.tgz}
+    engines: {node: '>=0.8'}
+
   chokidar@5.0.0:
     resolution: {integrity: sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw==, tarball: https://registry.npmmirror.com/chokidar/-/chokidar-5.0.0.tgz}
     engines: {node: '>= 20.19.0'}
@@ -1805,6 +1831,10 @@ packages:
   cluster-key-slot@1.1.1:
     resolution: {integrity: sha512-rwHwUfXL40Chm1r08yrhU3qpUvdVlgkKNeyeGPOxnW8/SyVDvgRaed/Uz54AqWNaTCAThlj6QAs3TZcKI0xDEw==, tarball: https://registry.npmmirror.com/cluster-key-slot/-/cluster-key-slot-1.1.1.tgz}
     engines: {node: '>=0.10.0'}
+
+  codepage@1.15.0:
+    resolution: {integrity: sha512-3g6NUTPd/YtuuGrhMnOMRjFc+LJw/bnMp3+0r/Wcz3IXUuCosKRJvMphm5+Q+bvTVGcJJuRvVLuYba+WojaFaA==, tarball: https://registry.npmmirror.com/codepage/-/codepage-1.15.0.tgz}
+    engines: {node: '>=0.8'}
 
   color-convert@2.0.1:
     resolution: {integrity: sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==, tarball: https://registry.npmmirror.com/color-convert/-/color-convert-2.0.1.tgz}
@@ -1865,6 +1895,9 @@ packages:
   cookie@0.7.2:
     resolution: {integrity: sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==, tarball: https://registry.npmmirror.com/cookie/-/cookie-0.7.2.tgz}
     engines: {node: '>= 0.6'}
+
+  core-js@3.50.0:
+    resolution: {integrity: sha512-BRWgOLKkFeCgRudR6zrs8p9XJZcE14grzKMMssoYrk6krtuEZ7MTKPIY5RzOnqsEKIR9kst7wNzphttraT+Yqw==, tarball: https://registry.npmmirror.com/core-js/-/core-js-3.50.0.tgz}
 
   core-util-is@1.0.3:
     resolution: {integrity: sha512-ZQBvi1DcpJ4GDqanjucZ2Hj3wEO5pZDS89BWbkcrvdxksJorwUDDZamX9ldFkp9aw2lmBDLgkObEA4DWNJ9FYQ==, tarball: https://registry.npmmirror.com/core-util-is/-/core-util-is-1.0.3.tgz}
@@ -2037,6 +2070,9 @@ packages:
     resolution: {integrity: sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w==, tarball: https://registry.npmmirror.com/domhandler/-/domhandler-5.0.3.tgz}
     engines: {node: '>= 4'}
 
+  dompurify@3.4.16:
+    resolution: {integrity: sha512-sqo+pNp3qRhCIpbgRi1y8Tgk27Bo2Ry7w0dC1NBeNTdZChWjz9Xb/KOoZbRP/R6pQZ80Qw8YhXw13hWWBbMRnQ==, tarball: https://registry.npmmirror.com/dompurify/-/dompurify-3.4.16.tgz}
+
   domutils@3.2.2:
     resolution: {integrity: sha512-6kZKyUajlDuqlHKVX1w7gyslj9MPIXzIFiz/rGu35uC1wMi+kMhQwGhl4lt9unC9Vb9INnY9Z3/ZA3+FhASLaw==, tarball: https://registry.npmmirror.com/domutils/-/domutils-3.2.2.tgz}
 
@@ -2196,6 +2232,9 @@ packages:
       picomatch:
         optional: true
 
+  fflate@0.4.9:
+    resolution: {integrity: sha512-zdxgIEddhfsyCaWpJ2SdXEP8ZMrKJ6+5jl4OupODcywU0IhRk6gdXuVGcPICyfx2H97hVK7xmJtRLPjkxAX8Vw==, tarball: https://registry.npmmirror.com/fflate/-/fflate-0.4.9.tgz}
+
   file-uri-to-path@1.0.0:
     resolution: {integrity: sha512-0Zt+s3L7Vf1biwWZ29aARiVYLx7iMGnEUl9x33fbB/j3jR81u/O2LbqK+Bm1CDSNDKVtJ/YjwY7TUd5SkeLQLw==, tarball: https://registry.npmmirror.com/file-uri-to-path/-/file-uri-to-path-1.0.0.tgz}
 
@@ -2206,6 +2245,10 @@ packages:
   foreground-child@3.3.1:
     resolution: {integrity: sha512-gIXjKqtFuWEgzFRJA9WCQeSJLZDjgJUOMCMzxtvFq/37KojM1BFGufqsCy0r4qSQmYLsZYMeyRqzIWOMup03sw==, tarball: https://registry.npmmirror.com/foreground-child/-/foreground-child-3.3.1.tgz}
     engines: {node: '>=14'}
+
+  frac@1.1.2:
+    resolution: {integrity: sha512-w/XBfkibaTl3YDqASwfDUqkna4Z2p9cFSr1aHDt0WoMTECnRfBOv2WArlZILlqgWlmdIlALXGpM2AOhEk5W3IA==, tarball: https://registry.npmmirror.com/frac/-/frac-1.1.2.tgz}
+    engines: {node: '>=0.8'}
 
   fraction.js@5.3.4:
     resolution: {integrity: sha512-1X1NTtiJphryn/uLQz3whtY6jK3fTqoE3ohKs0tT+Ujr1W59oopxmoEh7Lu5p6vBaPbgoM0bzveAW4Qi5RyWDQ==, tarball: https://registry.npmmirror.com/fraction.js/-/fraction.js-5.3.4.tgz}
@@ -2987,6 +3030,17 @@ packages:
     resolution: {integrity: sha512-RRuzqDtt5Y9h3quz5hWhK+TPnsmVs6WwSU6LkJMeY4HstUEDuYTG8UJSdawMRzmzAtV+KEoG8N3Qg2qLy5vM/A==, tarball: https://registry.npmmirror.com/postcss/-/postcss-8.5.28.tgz}
     engines: {node: ^10 || ^12 || >=14}
 
+  posthog-js@1.434.18:
+    resolution: {integrity: sha512-GK2ueRSwD1BBwIBm/HgjJBhHWxL46TRIEwxVJYde5GOk6lq1gaklBSfMBdEBHgqIcFG5BgMmN3M0NqGZ+sDULw==, tarball: https://registry.npmmirror.com/posthog-js/-/posthog-js-1.434.18.tgz}
+    peerDependencies:
+      '@types/react': '>=16.8.0'
+      react: '>=16.8.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      react:
+        optional: true
+
   powershell-utils@0.1.0:
     resolution: {integrity: sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A==, tarball: https://registry.npmmirror.com/powershell-utils/-/powershell-utils-0.1.0.tgz}
     engines: {node: '>=20'}
@@ -2994,6 +3048,14 @@ packages:
   powershell-utils@0.2.1:
     resolution: {integrity: sha512-C+y9x90UElAddDZmV4qOx9W53B61PO7cIqWz2dQsWlwswuq4mr8NEwytdGKboYbQlGZ3awrkTeNvcZiZNHnQ8A==, tarball: https://registry.npmmirror.com/powershell-utils/-/powershell-utils-0.2.1.tgz}
     engines: {node: '>=20'}
+
+  preact@10.29.8:
+    resolution: {integrity: sha512-ej2aVZ+vZ8WO7tvlQWRM9N63A0KzF9q4mWJfDUHgYaIofWY9hu74QdnQrjoPMmZi2/nZ5gN0bJCQF49xQqx09Q==, tarball: https://registry.npmmirror.com/preact/-/preact-10.29.8.tgz}
+    peerDependencies:
+      preact-render-to-string: '>=5'
+    peerDependenciesMeta:
+      preact-render-to-string:
+        optional: true
 
   pretty-bytes@7.1.3:
     resolution: {integrity: sha512-U2KZ675nqba6XSBppSjU2pRgc9Ffx9+uUtd/RTWYmOawVkZuUbBYuwdtFZQmLv+yMgQ2TQxWWuOpyNje67J9tg==, tarball: https://registry.npmmirror.com/pretty-bytes/-/pretty-bytes-7.1.3.tgz}
@@ -3014,6 +3076,9 @@ packages:
 
   quansync@0.2.11:
     resolution: {integrity: sha512-AifT7QEbW9Nri4tAwR5M/uzpBuqfZf+zwaEM/QkzEjj7NBuFD2rBuy0K3dE+8wltbezDV7JMA0WfnCPYRSYbXA==, tarball: https://registry.npmmirror.com/quansync/-/quansync-0.2.11.tgz}
+
+  query-selector-shadow-dom@1.0.1:
+    resolution: {integrity: sha512-lT5yCqEBgfoMYpf3F2xQRK7zEr1rhIIZuceDK6+xRkJQ4NMbHTwXqk4NkwDwQMNqXgG9r9fyHnzwNVs6zV5KRw==, tarball: https://registry.npmmirror.com/query-selector-shadow-dom/-/query-selector-shadow-dom-1.0.1.tgz}
 
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==, tarball: https://registry.npmmirror.com/queue-microtask/-/queue-microtask-1.2.3.tgz}
@@ -3220,6 +3285,10 @@ packages:
     resolution: {integrity: sha512-LqZxxBDMKuMAZzFzJnDCkFOrs9MZQZr0LvHiO/SuSZVdQaXD7xQ5UWTUxheJrQPve1qk9MG2B/yttUvJxw8egQ==, tarball: https://registry.npmmirror.com/srvx/-/srvx-0.11.22.tgz}
     engines: {node: '>=20.16.0'}
     hasBin: true
+
+  ssf@0.11.2:
+    resolution: {integrity: sha512-+idbmIXoYET47hH+d7dfm2epdOMUDjqcB4648sTZ+t2JwoyBFL/insLfB/racrDmsKB3diwsDA696pZMieAC5g==, tarball: https://registry.npmmirror.com/ssf/-/ssf-0.11.2.tgz}
+    engines: {node: '>=0.8'}
 
   stacktracey@2.2.0:
     resolution: {integrity: sha512-ETyQEz+CzXiLjEbyJqpbp+/T79RQD/6wqFucRBIlVNZfYq2Ay7wbretD4cxpbymZlaPWx58aIhPEY1Cr8DlVvg==, tarball: https://registry.npmmirror.com/stacktracey/-/stacktracey-2.2.0.tgz}
@@ -3711,6 +3780,12 @@ packages:
       typescript:
         optional: true
 
+  web-vitals@6.2.1:
+    resolution: {integrity: sha512-rLcLXA2sx6+9dE88NHFubwTtGxpK4yYBLj6qHPdFoCaLr0cXGb4efOqtKLlm4loGA4OEKHIQKMKzZkKyOh5ctw==, tarball: https://registry.npmmirror.com/web-vitals/-/web-vitals-6.2.1.tgz}
+
+  web-vitals@6.2.2:
+    resolution: {integrity: sha512-oto5x6dLEgrRqfcWed+pZEUb2q6ikbFmqF54CRDhI/QGbn+qxC49b4C4OkbH+kb9C3a8shpFD3SgR9kRcs80ZQ==, tarball: https://registry.npmmirror.com/web-vitals/-/web-vitals-6.2.2.tgz}
+
   webidl-conversions@3.0.1:
     resolution: {integrity: sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==, tarball: https://registry.npmmirror.com/webidl-conversions/-/webidl-conversions-3.0.1.tgz}
 
@@ -3729,6 +3804,14 @@ packages:
     resolution: {integrity: sha512-oGLe46MIrCRqX7ytPUf66EAYvdeMIZYn3WaocqqKZAxrBpkqHfL/qvTyJ/bTk5+AqHCjXmrv3CEWgy368zhRUg==, tarball: https://registry.npmmirror.com/which/-/which-6.0.1.tgz}
     engines: {node: ^20.17.0 || >=22.9.0}
     hasBin: true
+
+  wmf@1.0.2:
+    resolution: {integrity: sha512-/p9K7bEh0Dj6WbXg4JG0xvLQmIadrner1bi45VMJTfnbVHsc7yIajZyoSoK60/dtVBs12Fm6WkUI5/3WAVsNMw==, tarball: https://registry.npmmirror.com/wmf/-/wmf-1.0.2.tgz}
+    engines: {node: '>=0.8'}
+
+  word@0.3.0:
+    resolution: {integrity: sha512-OELeY0Q61OXpdUfTp+oweA/vtLVg5VDOXh+3he3PNzLGG/y0oylSOC1xRVj0+l4vQ3tj/bB1HVHv1ocXkQceFA==, tarball: https://registry.npmmirror.com/word/-/word-0.3.0.tgz}
+    engines: {node: '>=0.8'}
 
   workerd@1.20250718.0:
     resolution: {integrity: sha512-kqkIJP/eOfDlUyBzU7joBg+tl8aB25gEAGqDap+nFWb+WHhnooxjGHgxPBy3ipw2hnShPFNOQt5lFRxbwALirg==, tarball: https://registry.npmmirror.com/workerd/-/workerd-1.20250718.0.tgz}
@@ -3784,6 +3867,11 @@ packages:
   wsl-utils@1.0.0:
     resolution: {integrity: sha512-Hl0ZOAs672vg+06kfujwRhoS6/jehvULrlFkuF2dRu6pHgA8U06h3xqNIqNNU1LTXPcedxByAR4GS6pwQK0mgA==, tarball: https://registry.npmmirror.com/wsl-utils/-/wsl-utils-1.0.0.tgz}
     engines: {node: '>=20'}
+
+  xlsx@0.18.5:
+    resolution: {integrity: sha512-dmg3LCjBPHZnQp5/F/+nnTa+miPJxUXB6vtk42YjBBKayDNagxGEeIdWApkYPOf3Z3pm3k62Knjzp7lMeTEtFQ==, tarball: https://registry.npmmirror.com/xlsx/-/xlsx-0.18.5.tgz}
+    engines: {node: '>=0.8'}
+    hasBin: true
 
   y18n@5.0.8:
     resolution: {integrity: sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==, tarball: https://registry.npmmirror.com/y18n/-/y18n-5.0.8.tgz}
@@ -4952,6 +5040,17 @@ snapshots:
 
   '@poppinss/exception@1.2.3': {}
 
+  '@posthog/browser-common@0.9.0':
+    dependencies:
+      '@posthog/core': 1.55.2
+      '@posthog/types': 1.412.4
+
+  '@posthog/core@1.55.2':
+    dependencies:
+      '@posthog/types': 1.412.4
+
+  '@posthog/types@1.412.4': {}
+
   '@rolldown/pluginutils@1.0.1': {}
 
   '@rollup/plugin-alias@6.0.0(rollup@4.63.2)':
@@ -5107,6 +5206,9 @@ snapshots:
   '@types/estree@1.0.9': {}
 
   '@types/resolve@1.20.2': {}
+
+  '@types/trusted-types@2.0.7':
+    optional: true
 
   '@unhead/vue@2.1.17(vue@3.5.42(typescript@5.9.3))':
     dependencies:
@@ -5323,6 +5425,8 @@ snapshots:
 
   acorn@8.18.0: {}
 
+  adler-32@1.3.1: {}
+
   agent-base@7.1.4: {}
 
   alien-signals@1.0.13: {}
@@ -5511,6 +5615,11 @@ snapshots:
 
   caniuse-lite@1.0.30001810: {}
 
+  cfb@1.2.2:
+    dependencies:
+      adler-32: 1.3.1
+      crc-32: 1.2.2
+
   chokidar@5.0.0:
     dependencies:
       readdirp: 5.1.1
@@ -5530,6 +5639,8 @@ snapshots:
       wrap-ansi: 9.0.2
 
   cluster-key-slot@1.1.1: {}
+
+  codepage@1.15.0: {}
 
   color-convert@2.0.1:
     dependencies:
@@ -5582,6 +5693,8 @@ snapshots:
   cookie-es@3.1.1: {}
 
   cookie@0.7.2: {}
+
+  core-js@3.50.0: {}
 
   core-util-is@1.0.3: {}
 
@@ -5730,6 +5843,10 @@ snapshots:
   domhandler@5.0.3:
     dependencies:
       domelementtype: 2.3.0
+
+  dompurify@3.4.16:
+    optionalDependencies:
+      '@types/trusted-types': 2.0.7
 
   domutils@3.2.2:
     dependencies:
@@ -5915,6 +6032,8 @@ snapshots:
     optionalDependencies:
       picomatch: 4.0.7
 
+  fflate@0.4.9: {}
+
   file-uri-to-path@1.0.0: {}
 
   fill-range@7.1.1:
@@ -5925,6 +6044,8 @@ snapshots:
     dependencies:
       cross-spawn: 7.0.6
       signal-exit: 4.1.0
+
+  frac@1.1.2: {}
 
   fraction.js@5.3.4: {}
 
@@ -6924,9 +7045,26 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
+  posthog-js@1.434.18:
+    dependencies:
+      '@posthog/browser-common': 0.9.0
+      '@posthog/core': 1.55.2
+      '@posthog/types': 1.412.4
+      core-js: 3.50.0
+      dompurify: 3.4.16
+      fflate: 0.4.9
+      preact: 10.29.8
+      query-selector-shadow-dom: 1.0.1
+      web-vitals: 6.2.2
+      web-vitals-soft-navs: web-vitals@6.2.1
+    transitivePeerDependencies:
+      - preact-render-to-string
+
   powershell-utils@0.1.0: {}
 
   powershell-utils@0.2.1: {}
+
+  preact@10.29.8: {}
 
   pretty-bytes@7.1.3: {}
 
@@ -6943,6 +7081,8 @@ snapshots:
       signal-exit: 3.0.7
 
   quansync@0.2.11: {}
+
+  query-selector-shadow-dom@1.0.1: {}
 
   queue-microtask@1.2.3: {}
 
@@ -7190,6 +7330,10 @@ snapshots:
   sourcemap-codec@1.4.8: {}
 
   srvx@0.11.22: {}
+
+  ssf@0.11.2:
+    dependencies:
+      frac: 1.1.2
 
   stacktracey@2.2.0:
     dependencies:
@@ -7638,6 +7782,10 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
+  web-vitals@6.2.1: {}
+
+  web-vitals@6.2.2: {}
+
   webidl-conversions@3.0.1: {}
 
   webpack-virtual-modules@0.6.2: {}
@@ -7654,6 +7802,10 @@ snapshots:
   which@6.0.1:
     dependencies:
       isexe: 4.0.0
+
+  wmf@1.0.2: {}
+
+  word@0.3.0: {}
 
   workerd@1.20250718.0:
     optionalDependencies:
@@ -7709,6 +7861,16 @@ snapshots:
     dependencies:
       is-wsl: 3.1.1
       powershell-utils: 0.1.0
+
+  xlsx@0.18.5:
+    dependencies:
+      adler-32: 1.3.1
+      cfb: 1.2.2
+      codepage: 1.15.0
+      crc-32: 1.2.2
+      ssf: 0.11.2
+      wmf: 1.0.2
+      word: 0.3.0
 
   y18n@5.0.8: {}
 

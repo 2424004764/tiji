@@ -1,16 +1,16 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { HTTPException } from 'hono/http-exception'
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
 
 export type Env = { Bindings: { DB: D1Database; APP_ENV?: string; PUBLIC_APP_URL?: string } }
 type User = { id: string; username: string; locale: string; timezone: string }
-type QuestionInput = { type: 'single_choice' | 'true_false' | 'multiple_choice'; stem: string; options?: Array<{ value: string; label: string }>; answer: string | string[]; explanation?: string; difficulty?: number; tags?: string[] }
 
 const app = new Hono<Env>().basePath('/api/v1')
 const isLocalOrigin = (origin: string) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
 const allowedOrigins = (c: any) => String(c.env?.PUBLIC_APP_URL ?? '').split(',').map((s) => s.trim()).filter(Boolean)
 app.use('*', cors({ origin: (origin, c) => (isLocalOrigin(origin) || allowedOrigins(c).includes(origin) ? origin : null), credentials: true, allowHeaders: ['content-type'] }))
-app.onError((err, c) => { console.error('[api] unhandled:', err); return fail(c, 'INTERNAL_ERROR', '服务内部错误', 500) })
+app.onError((err, c) => { if (err instanceof HTTPException && err.res) return err.res; console.error('[api] unhandled:', err); return fail(c, 'INTERNAL_ERROR', '服务内部错误', 500) })
 const SESSION_COOKIE = 'tiji_session'
 const SESSION_DAYS = 30
 // Cloudflare Workers 的 Web Crypto 对 PBKDF2 迭代次数上限为 100000
@@ -40,6 +40,40 @@ async function verifyPassword(password: string, stored: string) {
 const parseBody = async (c: any) => { try { return await c.req.json() } catch { return null } }
 const cleanUsername = (value: unknown) => typeof value === 'string' && /^[\w-]{3,32}$/.test(value) ? value : null
 
+type ImportErrorCode = 'invalidType' | 'invalidStem' | 'invalidOptions' | 'invalidAnswer'
+type NormalizedQuestion = { type: 'single_choice' | 'multiple_choice' | 'true_false'; stem: string; options: Array<{ value: string; label: string }>; answer: string | string[]; explanation: string; difficulty: number; tags: string[] }
+
+// 单题创建与批量导入共用的校验/归一化，失败时返回 code（供前端 i18n）和 message（供 API 直调方）
+function normalizeQuestionInput(body: any): { ok: true; value: NormalizedQuestion } | { ok: false; code: ImportErrorCode; message: string } {
+  const validType = body?.type === 'single_choice' || body?.type === 'true_false' || body?.type === 'multiple_choice'
+  const stem = typeof body?.stem === 'string' ? body.stem.trim().slice(0, 2000) : ''
+  if (!validType) return { ok: false, code: 'invalidType', message: '题目内容不完整' }
+  if (!stem) return { ok: false, code: 'invalidStem', message: '题目内容不完整' }
+  const base = { stem, explanation: typeof body.explanation === 'string' ? body.explanation.trim().slice(0, 2000) : '', difficulty: Math.min(5, Math.max(1, Number(body.difficulty) || 1)), tags: (Array.isArray(body.tags) ? body.tags : []).map((t: any) => String(t).trim().slice(0, 20)).filter(Boolean).slice(0, 10) }
+  if (body.type === 'true_false') {
+    if (body.answer !== 'true' && body.answer !== 'false') return { ok: false, code: 'invalidAnswer', message: '请选择判断题答案' }
+    return { ok: true, value: { type: 'true_false', ...base, options: [{ value: 'true', label: '正确' }, { value: 'false', label: '错误' }], answer: body.answer } }
+  }
+  let options: Array<{ value: string; label: string }> = (Array.isArray(body.options) ? body.options : []).map((o: any, i: number) => { const provided = typeof o?.value === 'string' && /^[a-z0-9_-]{1,8}$/i.test(o.value) ? o.value : String.fromCharCode(97 + i); return { value: provided, label: String(o?.label ?? '').trim().slice(0, 200) } }).filter((o: any) => o.label).slice(0, 6)
+  const seen = new Set<string>(); options = options.filter((o: any) => { if (seen.has(o.value)) return false; seen.add(o.value); return true })
+  if (options.length < 2) return { ok: false, code: 'invalidOptions', message: '选择题至少需要两个选项' }
+  if (body.type === 'single_choice') {
+    if (typeof body.answer !== 'string' || !options.some((o: any) => o.value === body.answer)) return { ok: false, code: 'invalidAnswer', message: '请选择正确答案' }
+    return { ok: true, value: { type: 'single_choice', ...base, options, answer: body.answer } }
+  }
+  const picked: string[] = (Array.isArray(body.answer) ? body.answer : []).map((v: any) => String(v)).filter((v: string) => options.some((o: any) => o.value === v))
+  const answer = [...new Set(picked)].sort()
+  if (!answer.length) return { ok: false, code: 'invalidAnswer', message: '请至少勾选一个正确答案' }
+  return { ok: true, value: { type: 'multiple_choice', ...base, options, answer } }
+}
+
+const questionInsert = (db: D1Database, question: NormalizedQuestion, questionId: string, ownerId: string, timestamp: string) =>
+  db.prepare('INSERT INTO questions(id,owner_id,type,stem,options_json,answer_json,explanation,difficulty,tags_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(questionId, ownerId, question.type, question.stem, JSON.stringify(question.options), JSON.stringify(question.answer), question.explanation, question.difficulty, JSON.stringify(question.tags), timestamp, timestamp)
+// position 用子查询取当前最大值 +1，批量语句按顺序执行时可正确接续
+const bankQuestionInsert = (db: D1Database, bankId: string, questionId: string, timestamp: string) =>
+  db.prepare('INSERT INTO bank_questions(bank_id,question_id,position,created_at) SELECT ?,?,COALESCE(MAX(position),-1)+1,? FROM bank_questions WHERE bank_id=?').bind(bankId, questionId, timestamp, bankId)
+
 async function currentUser(c: any): Promise<User | null> {
   const token = getCookie(c, SESSION_COOKIE)
   if (!token) return null
@@ -47,7 +81,7 @@ async function currentUser(c: any): Promise<User | null> {
   if (row) await c.env.DB.prepare('UPDATE sessions SET last_seen_at=? WHERE token_hash=?').bind(now(), await sha256(token)).run()
   return row || null
 }
-async function requireUser(c: any) { const user = await currentUser(c); if (!user) return fail(c, 'AUTH_REQUIRED', '请先登录', 401); return user }
+async function requireUser(c: any): Promise<User> { const user = await currentUser(c); if (!user) throw new HTTPException(401, { res: fail(c, 'AUTH_REQUIRED', '请先登录', 401) }); return user }
 async function createSession(c: any, userId: string) {
   const token = randomToken(32); const timestamp = Date.now(); const expires = new Date(timestamp + SESSION_DAYS * 86400000).toISOString()
   await c.env.DB.prepare('INSERT INTO sessions(id,user_id,token_hash,expires_at,created_at,last_seen_at) VALUES(?,?,?,?,?,?)').bind(id(), userId, await sha256(token), expires, now(), now()).run()
@@ -75,7 +109,30 @@ app.get('/auth/me', async (c) => { const user = await currentUser(c); return use
 
 app.get('/banks', async (c) => { const user = await requireUser(c); if (typeof user !== 'object') return user; const rows = await c.env.DB.prepare('SELECT b.id,b.name,b.description,b.visibility,b.status,b.created_at,b.updated_at,(SELECT COUNT(*) FROM bank_questions bq JOIN questions q ON q.id=bq.question_id AND q.deleted_at IS NULL WHERE bq.bank_id=b.id) AS question_count,(SELECT json_object(\'id\',a.id,\'status\',a.status) FROM activities a WHERE a.bank_id=b.id ORDER BY a.created_at DESC LIMIT 1) AS activity FROM question_banks b WHERE b.owner_id=? AND b.deleted_at IS NULL ORDER BY b.updated_at DESC').bind(user.id).all(); return json(c, rows.results) })
 app.post('/banks', async (c) => { const user = await requireUser(c); if (typeof user !== 'object') return user; const body = await parseBody(c); const name = typeof body?.name === 'string' ? body.name.trim() : ''; if (!name || name.length > 100) return fail(c, 'VALIDATION_ERROR', '题库名称不能为空且不能超过 100 字', 400); const bankId = id(); const timestamp = now(); await c.env.DB.prepare('INSERT INTO question_banks(id,owner_id,name,description,visibility,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').bind(bankId,user.id,name,typeof body.description === 'string' ? body.description.slice(0,500) : '',body.visibility === 'public' ? 'public' : 'private',timestamp,timestamp).run(); return json(c,{ id: bankId, name },201) })
-app.post('/banks/:bankId/questions', async (c) => { const user = await requireUser(c); if (typeof user !== 'object') return user; const bankId = c.req.param('bankId'); const bank = await c.env.DB.prepare('SELECT id FROM question_banks WHERE id=? AND owner_id=? AND deleted_at IS NULL').bind(bankId,user.id).first(); if (!bank) return fail(c,'NOT_FOUND','题库不存在',404); const body = await parseBody(c) as QuestionInput | null; const validType = body?.type === 'single_choice' || body?.type === 'true_false' || body?.type === 'multiple_choice'; const stem = typeof body?.stem === 'string' ? body.stem.trim().slice(0,2000) : ''; if (!validType || !stem) return fail(c,'VALIDATION_ERROR','题目内容不完整',400); let options: Array<{value:string;label:string}>; let answerValue: string | string[]; if (body.type === 'true_false') { options = [{value:'true',label:'正确'},{value:'false',label:'错误'}]; if (body.answer !== 'true' && body.answer !== 'false') return fail(c,'VALIDATION_ERROR','请选择判断题答案',400); answerValue = body.answer } else { options = (Array.isArray(body.options) ? body.options : []).map((o:any,i:number)=>{ const provided = typeof o?.value === 'string' && /^[a-z0-9_-]{1,8}$/i.test(o.value) ? o.value : String.fromCharCode(97+i); return { value: provided, label: String(o?.label??'').trim().slice(0,200) } }).filter(o=>o.label).slice(0,6); const seen = new Set<string>(); options = options.filter(o=>{ if(seen.has(o.value)) return false; seen.add(o.value); return true }); if (options.length < 2) return fail(c,'VALIDATION_ERROR','选择题至少需要两个选项',400); if (body.type === 'single_choice') { if (typeof body.answer !== 'string' || !options.some(o=>o.value===body.answer)) return fail(c,'VALIDATION_ERROR','请选择正确答案',400); answerValue = body.answer } else { const picked = (Array.isArray(body.answer) ? body.answer : []).map((v:any)=>String(v)).filter(v=>options.some(o=>o.value===v)); answerValue = [...new Set(picked)].sort(); if (!answerValue.length) return fail(c,'VALIDATION_ERROR','请至少勾选一个正确答案',400) } } const questionId=id(); const timestamp=now(); const tags=(Array.isArray(body.tags)?body.tags:[]).map((t:any)=>String(t).trim().slice(0,20)).filter(Boolean).slice(0,10); await c.env.DB.batch([c.env.DB.prepare('INSERT INTO questions(id,owner_id,type,stem,options_json,answer_json,explanation,difficulty,tags_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(questionId,user.id,body.type,stem,JSON.stringify(options),JSON.stringify(answerValue),typeof body.explanation === 'string' ? body.explanation.trim().slice(0,2000) : '',Math.min(5,Math.max(1,Number(body.difficulty)||1)),JSON.stringify(tags),timestamp,timestamp), c.env.DB.prepare('INSERT INTO bank_questions(bank_id,question_id,position,created_at) SELECT ?,?,COALESCE(MAX(position),-1)+1,? FROM bank_questions WHERE bank_id=?').bind(bankId,questionId,timestamp,bankId)]); return json(c,{ id: questionId },201) })
+app.post('/banks/:bankId/questions', async (c) => { const user = await requireUser(c); if (typeof user !== 'object') return user; const bankId = c.req.param('bankId'); const bank = await c.env.DB.prepare('SELECT id FROM question_banks WHERE id=? AND owner_id=? AND deleted_at IS NULL').bind(bankId,user.id).first(); if (!bank) return fail(c,'NOT_FOUND','题库不存在',404); const parsed = normalizeQuestionInput(await parseBody(c)); if (!parsed.ok) return fail(c,'VALIDATION_ERROR',parsed.message,400); const timestamp=now(); const questionId=id(); await c.env.DB.batch([questionInsert(c.env.DB, parsed.value, questionId, user.id, timestamp), bankQuestionInsert(c.env.DB, bankId, questionId, timestamp)]); return json(c,{ id: questionId },201) })
+
+app.post('/banks/:bankId/questions/import', async (c) => {
+  const user = await requireUser(c); if (typeof user !== 'object') return user
+  const bankId = c.req.param('bankId')
+  const bank = await c.env.DB.prepare('SELECT id FROM question_banks WHERE id=? AND owner_id=? AND deleted_at IS NULL').bind(bankId, user.id).first()
+  if (!bank) return fail(c, 'NOT_FOUND', '题库不存在', 404)
+  const body = await parseBody(c)
+  const list = Array.isArray(body?.questions) ? body.questions : []
+  if (!list.length) return fail(c, 'VALIDATION_ERROR', '没有可导入的题目', 400)
+  if (list.length > 100) return fail(c, 'VALIDATION_ERROR', '单次最多导入 100 道题', 400)
+  const normalized: NormalizedQuestion[] = []
+  const invalid: Array<{ index: number; code: ImportErrorCode; message: string }> = []
+  list.forEach((item: any, index: number) => { const parsed = normalizeQuestionInput(item); if (parsed.ok) normalized.push(parsed.value); else invalid.push({ index, code: parsed.code, message: parsed.message }) })
+  if (invalid.length) return c.json({ data: null, error: { code: 'VALIDATION_ERROR', message: '部分题目无效，未导入任何题目', invalid }, meta: {} }, 400)
+  const timestamp = now()
+  const statements: D1PreparedStatement[] = []
+  for (const question of normalized) {
+    const questionId = id()
+    statements.push(questionInsert(c.env.DB, question, questionId, user.id, timestamp), bankQuestionInsert(c.env.DB, bankId, questionId, timestamp))
+  }
+  await c.env.DB.batch(statements)
+  return json(c, { imported: normalized.length }, 201)
+})
 
 app.get('/banks/:bankId', async (c) => { const user = await requireUser(c); if (typeof user !== 'object') return user; const bankId = c.req.param('bankId'); const bank = await c.env.DB.prepare('SELECT id,name,description,visibility,status,created_at,updated_at,(SELECT COUNT(*) FROM bank_questions bq JOIN questions q ON q.id=bq.question_id AND q.deleted_at IS NULL WHERE bq.bank_id=question_banks.id) AS question_count,(SELECT json_object(\'id\',a.id,\'status\',a.status) FROM activities a WHERE a.bank_id=question_banks.id ORDER BY a.created_at DESC LIMIT 1) AS activity FROM question_banks WHERE id=? AND owner_id=? AND deleted_at IS NULL').bind(bankId,user.id).first() as any; if (!bank) return fail(c,'NOT_FOUND','题库不存在',404); if (bank && typeof bank.activity === 'string') { try { bank.activity = JSON.parse(bank.activity) } catch { bank.activity = null } } return json(c,bank) })
 
@@ -93,7 +150,7 @@ app.get('/activities/:id/share', async (c) => { const user=await requireUser(c);
 app.post('/activities/:id/end', async (c) => { const user=await requireUser(c); if(typeof user!=='object') return user; const activityId=c.req.param('id'); const row=await c.env.DB.prepare('SELECT id,status FROM activities WHERE id=? AND owner_id=?').bind(activityId,user.id).first() as any; if(!row) return fail(c,'NOT_FOUND','活动不存在',404); if(row.status==='ended') return json(c,{id:activityId,status:'ended'}); const timestamp=now(); await c.env.DB.prepare('UPDATE activities SET status=\'ended\',updated_at=? WHERE id=?').bind(timestamp,activityId).run(); return json(c,{id:activityId,status:'ended'}) })
 
 async function publicActivity(c:any) { const token=c.req.param('token'); return c.env.DB.prepare('SELECT a.id,a.title,a.description,a.status,b.name AS bank_name FROM activities a LEFT JOIN question_banks b ON b.id=a.bank_id WHERE a.share_token=?').bind(token).first() as any }
-app.get('/public/activities/:token', async (c) => { const activity=await publicActivity(c); if(!activity) return fail(c,'NOT_FOUND','活动不存在',404); if(activity.status!=='published') return fail(c,'ACTIVITY_NOT_OPEN','活动当前不可答题',409); const questions=await c.env.DB.prepare('SELECT question_id AS id,type,stem,options_json AS options,tags_json AS tags,points FROM activity_questions WHERE activity_id=? ORDER BY position').bind(activity.id).all() as any; return json(c,{...activity,questions:questions.results.map((q: any) =>({...q,options:JSON.parse(q.options),tags:JSON.parse(q.tags||'[]')}))}) })
+app.get('/public/activities/:token', async (c) => { const activity=await publicActivity(c); if(!activity) return fail(c,'NOT_FOUND','活动不存在',404); if(activity.status!=='published') return fail(c,'ACTIVITY_NOT_OPEN','活动当前不可答题',409); const questions=await c.env.DB.prepare('SELECT question_id AS id,type,stem,options_json AS options,tags_json AS tags,answer_json AS answer,explanation,points FROM activity_questions WHERE activity_id=? ORDER BY position').bind(activity.id).all() as any; return json(c,{...activity,questions:questions.results.map((q: any) =>({...q,options:JSON.parse(q.options),tags:JSON.parse(q.tags||'[]'),answer:JSON.parse(q.answer??'null')}))}) })
 app.post('/public/activities/:token/start', async (c) => { const activity=await publicActivity(c); if(!activity || activity.status!=='published') return fail(c,'ACTIVITY_NOT_OPEN','活动当前不可答题',409); const body=await parseBody(c); const displayName=typeof body?.displayName==='string'?body.displayName.trim():''; if(!displayName || displayName.length>40) return fail(c,'VALIDATION_ERROR','请输入 1-40 位显示名',400); const respondentId=id(); const attemptId=id(); const timestamp=now(); await c.env.DB.batch([c.env.DB.prepare('INSERT INTO respondents(id,activity_id,display_name,anonymous_key,created_at) VALUES(?,?,?,?,?)').bind(respondentId,activity.id,displayName,randomToken(16),timestamp),c.env.DB.prepare('INSERT INTO attempts(id,activity_id,respondent_id,status,idempotency_key,started_at) VALUES(?,?,?,?,?,?)').bind(attemptId,activity.id,respondentId,'in_progress',randomToken(16),timestamp)]); return json(c,{attemptId,activityId:activity.id,displayName}) })
 app.post('/public/activities/:token/submit', async (c) => { const activity=await publicActivity(c); if(!activity || activity.status!=='published') return fail(c,'ACTIVITY_NOT_OPEN','活动当前不可答题',409); const body=await parseBody(c); const attemptId=typeof body?.attemptId==='string'?body.attemptId:''; const answers=body?.answers && typeof body.answers==='object'?body.answers:{}; const attempt=await c.env.DB.prepare('SELECT id,started_at,status FROM attempts WHERE id=? AND activity_id=?').bind(attemptId,activity.id).first() as any; if(!attempt) return fail(c,'NOT_FOUND','答卷不存在',404); if(attempt.status==='submitted') { const result=await c.env.DB.prepare('SELECT score,total_points,duration_seconds FROM attempts WHERE id=?').bind(attemptId).first(); return json(c,result) } const questions=await c.env.DB.prepare('SELECT question_id,type,answer_json,points FROM activity_questions WHERE activity_id=?').bind(activity.id).all() as any; let score=0,total=0; const timestamp=now(); const writes=questions.results.map((q: any) =>{ const answer=answers[q.question_id]; const expected=JSON.parse(q.answer_json); let correct; if(q.type==='short_answer'){ correct=null } else if(q.type==='multiple_choice'){ const g=Array.isArray(answer)?[...answer].map(String).sort():[]; const e=Array.isArray(expected)?[...expected].map(String).sort():[]; correct=g.length===e.length&&g.every((v,i)=>v===e[i]) } else { correct=JSON.stringify(answer)===JSON.stringify(expected) } total+=q.type==='short_answer'?0:q.points; if(correct===true) score+=q.points; return c.env.DB.prepare('INSERT INTO attempt_answers(id,attempt_id,question_id,answer_json,is_correct,points,answered_at) VALUES(?,?,?,?,?,?,?)').bind(id(),attemptId,q.question_id,JSON.stringify(answer??null),correct===null?null:(correct?1:0),correct===null?null:(correct?q.points:0),timestamp) }); writes.push(c.env.DB.prepare('UPDATE attempts SET status=\'submitted\',score=?,total_points=?,duration_seconds=?,submitted_at=? WHERE id=? AND status=\'in_progress\'').bind(score,total,Math.max(0,Math.floor((Date.parse(timestamp)-Date.parse(attempt.started_at))/1000)),timestamp,attemptId)); await c.env.DB.batch(writes); return json(c,{attemptId,score,totalPoints:total,submittedAt:timestamp}) })
 app.get('/activities/:id', async (c) => { const user=await requireUser(c); if(typeof user!=='object') return user; const activityId=c.req.param('id'); const activity=await c.env.DB.prepare('SELECT a.id,a.title,a.description,a.status,a.bank_id,a.published_at,(SELECT COUNT(*) FROM activity_questions aq WHERE aq.activity_id=a.id) AS question_count FROM activities a WHERE a.id=? AND a.owner_id=?').bind(activityId,user.id).first(); if(!activity) return fail(c,'NOT_FOUND','活动不存在',404); return json(c,activity) })

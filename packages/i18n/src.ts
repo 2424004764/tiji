@@ -219,6 +219,24 @@ const zhCN = {
       saving: '保存中…',
       submit: '添加题目'
     },
+    import: {
+      tab: 'Excel 导入',
+      hint: '上传 Excel（xlsx / xls / csv）文件，一次导入整批题目，选择题与判断题自动识别。',
+      template: '下载模板',
+      chooseFile: '选择文件',
+      parsed: '识别到 {n} 道题：单选 {single} · 多选 {multiple} · 判断 {tf}',
+      rowError: '第 {row} 行：{reason}',
+      tooMany: '单次最多导入 100 道题，当前文件有 {n} 行。',
+      noRows: '文件里没有识别到题目。',
+      parseFailed: '文件解析失败，请确认为 xlsx / xls / csv 格式。',
+      importBtn: '导入 {n} 道题',
+      importing: '导入中…',
+      success: '成功导入 {n} 道题。',
+      requestFailed: '导入失败，请稍后重试。',
+      errInvalidStem: '缺少题干',
+      errInvalidOptions: '选择题至少需要两个选项',
+      errInvalidAnswer: '答案缺失、无法识别或超出选项范围'
+    },
     list: {
       title: '题目列表',
       error: '题目加载失败，请刷新重试。',
@@ -268,6 +286,11 @@ const zhCN = {
     sheetDone: '完成',
     sheetAnswered: '已答 {done} / {total}',
     sheetHint: '绿色 = 已作答，点击题号直接跳转',
+    confirmAnswer: '确定',
+    correct: '回答正确。',
+    wrong: '回答错误。',
+    correctAnswer: '正确答案',
+    explanation: '解析',
     resultEyebrow: '答题完成',
     thanks: '{name}，感谢作答！结果已同步给出题人。',
     review: '返回检查答卷'
@@ -521,6 +544,24 @@ const enUS: MessageSchema = {
       saving: 'Saving…',
       submit: 'Add question'
     },
+    import: {
+      tab: 'Excel import',
+      hint: 'Upload an Excel file (xlsx / xls / csv) to import questions in bulk. Choice and true/false types are detected automatically.',
+      template: 'Download template',
+      chooseFile: 'Choose file',
+      parsed: 'Found 1 question: {single} single · {multiple} multiple · {tf} true/false | Found {n} questions: {single} single · {multiple} multiple · {tf} true/false',
+      rowError: 'Row {row}: {reason}',
+      tooMany: 'At most 100 questions per import — this file has {n} rows.',
+      noRows: 'No questions found in the file.',
+      parseFailed: 'Failed to read the file. Please use xlsx / xls / csv.',
+      importBtn: 'Import 1 question | Import {n} questions',
+      importing: 'Importing…',
+      success: 'Imported 1 question. | Imported {n} questions.',
+      requestFailed: 'Import failed. Please try again later.',
+      errInvalidStem: 'missing question text',
+      errInvalidOptions: 'choice questions need at least two options',
+      errInvalidAnswer: 'answer missing, unrecognized, or out of range'
+    },
     list: {
       title: 'Questions',
       error: 'Failed to load questions. Please refresh and retry.',
@@ -570,6 +611,11 @@ const enUS: MessageSchema = {
     sheetDone: 'Done',
     sheetAnswered: '{done} / {total} answered',
     sheetHint: 'Green = answered. Click a number to jump to that question.',
+    confirmAnswer: 'Confirm',
+    correct: 'Correct!',
+    wrong: 'Incorrect.',
+    correctAnswer: 'Correct answer',
+    explanation: 'Explanation',
     resultEyebrow: 'Quiz complete',
     thanks: 'Thanks for answering, {name}! Your results have been sent to the quiz creator.',
     review: 'Review my answers'

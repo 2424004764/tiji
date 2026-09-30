@@ -7,7 +7,7 @@ useSeoMeta({
 })
 
 interface PubOption { value: string; label: string }
-interface PubQuestion { id: string; type: 'single_choice' | 'multiple_choice' | 'true_false'; stem: string; tags: string[]; options: PubOption[] }
+interface PubQuestion { id: string; type: 'single_choice' | 'multiple_choice' | 'true_false'; stem: string; tags: string[]; options: PubOption[]; answer?: string | string[] | null; explanation?: string }
 
 const route = useRoute()
 const config = useRuntimeConfig()
@@ -63,6 +63,41 @@ function isAnswered(q: PubQuestion) {
   const v = answers.value[q.id]
   return Array.isArray(v) ? v.length > 0 : !!v
 }
+
+// 即答即判：作答过的题锁定并展示对错与解析（multiple_choice 需点确认）
+const revealed = ref<Record<string, boolean>>({})
+
+function isRevealed(q: PubQuestion) { return !!revealed.value[q.id] && q.answer !== undefined && q.answer !== null }
+
+function isCorrectAnswer(q: PubQuestion) {
+  const v = answers.value[q.id]
+  const expected = q.answer
+  if (v === undefined || expected === undefined || expected === null) return false
+  if (Array.isArray(expected)) {
+    const g = Array.isArray(v) ? [...v].map(String).sort() : []
+    const e = [...expected].map(String).sort()
+    return g.length === e.length && g.every((x, i) => x === e[i])
+  }
+  return JSON.stringify(v) === JSON.stringify(expected)
+}
+
+function correctAnswerText(q: PubQuestion) {
+  if (q.answer === undefined || q.answer === null) return ''
+  const vals = Array.isArray(q.answer) ? q.answer : [q.answer]
+  return vals.map((v) => q.options.find((o) => o.value === v)?.label ?? String(v)).join('、')
+}
+
+function isCorrectValue(q: PubQuestion, value: string) {
+  return Array.isArray(q.answer) ? q.answer.includes(value) : q.answer === value
+}
+
+function optRight(q: PubQuestion, value: string) { return isRevealed(q) && isCorrectValue(q, value) }
+function optWrong(q: PubQuestion, value: string) {
+  const v = answers.value[q.id]
+  return isRevealed(q) && !isCorrectValue(q, value) && (Array.isArray(v) ? v.includes(value) : v === value)
+}
+
+function reveal(q: PubQuestion) { revealed.value = { ...revealed.value, [q.id]: true } }
 
 function nextQuestion() { if (current.value < questions.value.length - 1) current.value++ }
 function prevQuestion() { if (current.value > 0) current.value-- }
@@ -144,13 +179,19 @@ async function start() {
 
 function pick(q: PubQuestion, value: string) {
   if (suppressClick.value) return
+  if (isRevealed(q)) return
   if (q.type === 'multiple_choice') {
     const current = Array.isArray(answers.value[q.id]) ? [...answers.value[q.id] as string[]] : []
     const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value].sort()
     answers.value = { ...answers.value, [q.id]: next }
   } else {
     answers.value = { ...answers.value, [q.id]: value }
+    reveal(q)
   }
+}
+
+function confirmMultiple(q: PubQuestion) {
+  if (isAnswered(q)) reveal(q)
 }
 
 function isSelected(q: PubQuestion, value: string) {
@@ -239,9 +280,24 @@ async function submitAnswers() {
                     :key="opt.value"
                     type="button"
                     class="option"
-                    :class="{ selected: isSelected(q, opt.value) }"
+                    :class="{ selected: isSelected(q, opt.value), right: optRight(q, opt.value), wrong: optWrong(q, opt.value) }"
                     @click="pick(q, opt.value)"
-                  >{{ opt.label }}</button>
+                  >{{ opt.label }}<span v-if="optRight(q, opt.value)" class="opt-mark">✓</span><span v-if="optWrong(q, opt.value)" class="opt-mark">✕</span></button>
+                </div>
+                <button
+                  v-if="q.type === 'multiple_choice' && isAnswered(q) && !isRevealed(q)"
+                  type="button"
+                  class="confirm-btn"
+                  @click="confirmMultiple(q)"
+                >{{ t('quiz.confirmAnswer') }}</button>
+                <div v-if="isRevealed(q)" class="feedback" :class="isCorrectAnswer(q) ? 'right' : 'wrong'" role="status">
+                  <p class="feedback-title">{{ isCorrectAnswer(q) ? t('quiz.correct') : t('quiz.wrong') }}</p>
+                  <p v-if="!isCorrectAnswer(q) && correctAnswerText(q)" class="feedback-answer">{{ t('quiz.correctAnswer') }}</p>
+                  <p v-if="!isCorrectAnswer(q) && correctAnswerText(q)" class="feedback-answer-value">{{ correctAnswerText(q) }}</p>
+                  <p v-if="q.explanation" class="feedback-explanation">
+                    <span class="feedback-label">{{ t('quiz.explanation') }}</span>
+                    {{ q.explanation }}
+                  </p>
                 </div>
               </div>
             </section>
@@ -255,7 +311,7 @@ async function submitAnswers() {
               v-for="(q, i) in questions"
               :key="q.id"
               class="dot"
-              :class="{ active: i === current, done: isAnswered(q) }"
+              :class="{ active: i === current, done: isAnswered(q), right: isRevealed(q) && isCorrectAnswer(q), wrong: isRevealed(q) && !isCorrectAnswer(q) }"
               role="tab"
               :aria-label="t('quiz.questionAria', { n: i + 1 })"
               @click="current = i"
@@ -282,7 +338,7 @@ async function submitAnswers() {
                 :key="q.id"
                 type="button"
                 class="sheet-cell"
-                :class="{ answered: isAnswered(q), current: i === current }"
+                :class="{ answered: isAnswered(q), current: i === current, right: isRevealed(q) && isCorrectAnswer(q), wrong: isRevealed(q) && !isCorrectAnswer(q) }"
                 @click="jumpTo(i)"
               >{{ i + 1 }}</button>
             </div>
@@ -388,6 +444,8 @@ form { display: grid; gap: 16px; margin-top: 6px; }
 }
 .sheet-cell:active { transform: scale(0.93); }
 .sheet-cell.answered { background: var(--accent-soft); border-color: transparent; color: var(--accent-strong); }
+.sheet-cell.right { background: var(--accent-soft); border-color: transparent; color: var(--accent-strong); }
+.sheet-cell.wrong { background: var(--wrong-soft); border-color: transparent; color: var(--wrong); }
 .sheet-cell.current { background: var(--accent); border-color: var(--accent); color: #fff; }
 .sheet-hint { margin: 16px 0 0; font-size: 12.5px; color: var(--muted-2); }
 @keyframes mask-in { from { opacity: 0 } to { opacity: 1 } }
@@ -396,13 +454,14 @@ form { display: grid; gap: 16px; margin-top: 6px; }
   .sheet, .sheet-mask { animation: none; }
 }
 .nav-btn {
-  height: 36px; padding: 0 16px; border: 1px solid var(--line-strong); border-radius: 999px;
+  flex: none; height: 36px; padding: 0 16px; border: 1px solid var(--line-strong); border-radius: 999px;
   background: var(--surface); color: var(--ink); font: inherit; font-size: 13.5px; cursor: pointer;
+  white-space: nowrap;
   transition: border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
 }
 .nav-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-strong); }
 .nav-btn:disabled { opacity: 0.35; cursor: default; }
-.dots { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; }
+.dots { flex: 1; min-width: 0; display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; }
 .dot {
   width: 8px; height: 8px; border-radius: 999px; background: var(--line-strong);
   cursor: pointer; transition: background 0.2s ease, width 0.2s ease;

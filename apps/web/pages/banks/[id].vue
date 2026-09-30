@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { MessageKey } from '@tiji/i18n'
+import type { ImportParseResult, ImportQuestion, ImportErrorCode } from '~/utils/questionImport'
+import { parseImportRows, IMPORT_LIMIT } from '~/utils/questionImport'
 
 const { t, apiError } = useI18n()
 
@@ -63,7 +65,7 @@ async function resyncSnapshot() {
   }
 }
 
-const qType = ref<'choice' | 'true_false'>('choice')
+const qType = ref<'choice' | 'true_false' | 'import'>('choice')
 const stem = ref('')
 const optionRows = ref([{ key: 'a', label: '' }, { key: 'b', label: '' }, { key: 'c', label: '' }, { key: 'd', label: '' }])
 const answer = ref('')
@@ -160,11 +162,111 @@ async function loadQuestions() {
   }
 }
 
-function switchType(next: 'choice' | 'true_false') {
+function switchType(next: 'choice' | 'true_false' | 'import') {
   qType.value = next
   answer.value = ''
   multiAnswer.value = []
   saveError.value = ''
+}
+
+const importFileInput = ref<HTMLInputElement | null>(null)
+const importFileName = ref('')
+const importResult = ref<ImportParseResult | null>(null)
+const importTooMany = ref(false)
+const importing = ref(false)
+const importError = ref('')
+const importSuccess = ref('')
+const importErrorCodeMap: Record<ImportErrorCode, MessageKey> = {
+  invalidStem: 'bank.import.errInvalidStem',
+  invalidOptions: 'bank.import.errInvalidOptions',
+  invalidAnswer: 'bank.import.errInvalidAnswer'
+}
+
+const canImport = computed(() => !!importResult.value && importResult.value.questions.length > 0 && importResult.value.errors.length === 0 && !importTooMany.value)
+const importSummary = computed(() => {
+  const list = importResult.value?.questions ?? []
+  return {
+    n: list.length,
+    single: list.filter((q) => q.type === 'single_choice').length,
+    multiple: list.filter((q) => q.type === 'multiple_choice').length,
+    tf: list.filter((q) => q.type === 'true_false').length
+  }
+})
+
+function resetImportState() {
+  importResult.value = null
+  importTooMany.value = false
+  importError.value = ''
+  importFileName.value = ''
+}
+
+async function onImportFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  importSuccess.value = ''
+  resetImportState()
+  // 清空 value，让同一文件可以重复选择
+  input.value = ''
+  if (!file) return
+  importFileName.value = file.name
+  try {
+    const XLSX = await import('xlsx')
+    const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows = sheet ? XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' }) : []
+    const result = parseImportRows(rows)
+    importResult.value = result
+    importTooMany.value = result.totalRows > IMPORT_LIMIT
+    if (!result.totalRows) importError.value = t('bank.import.noRows')
+  } catch {
+    importResult.value = null
+    importError.value = t('bank.import.parseFailed')
+  }
+}
+
+function importAnswerText(question: ImportQuestion) {
+  const separator = t('common.listSeparator')
+  if (question.type === 'true_false') return question.answer === 'true' ? t('common.optionTrue') : t('common.optionFalse')
+  const values = Array.isArray(question.answer) ? question.answer : [question.answer]
+  return values.map((value) => question.options?.find((option) => option.value === value)?.label ?? String(value).toUpperCase()).join(separator)
+}
+
+async function downloadTemplate() {
+  const XLSX = await import('xlsx')
+  const rows = [
+    ['题干', '选项A', '选项B', '选项C', '选项D', '选项E', '选项F', '答案', '解析', '难度', '标签'],
+    ['在 Photoshop 中，新建文档时默认且最适合用于网页、屏幕显示的色彩模式是？', 'CMYK 模式', 'RGB 模式', '灰度模式', 'LAB 模式', '', '', 'B', '新建文档默认为 RGB 模式。', 3, 'PS,基础'],
+    ['下列哪些属于前端语言？', 'HTML', 'CSS', 'JavaScript', 'Python', '', '', 'A、B、C', '', 2, '前端'],
+    ['HTTP 状态码 404 表示资源未找到。', '', '', '', '', '', '', '正确', '', '', '']
+  ]
+  const sheet = XLSX.utils.aoa_to_sheet(rows)
+  sheet['!cols'] = [{ wch: 44 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 28 }, { wch: 8 }, { wch: 14 }]
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, sheet, '题目')
+  XLSX.writeFile(workbook, 'tiji-questions-template.xlsx')
+}
+
+async function submitImport() {
+  const result = importResult.value
+  if (!result || !canImport.value || importing.value) return
+  importing.value = true
+  importError.value = ''
+  importSuccess.value = ''
+  try {
+    const res = await $fetch<{ data: { imported: number } }>(`${config.public.apiBase}/banks/${bankId.value}/questions/import`, {
+      method: 'POST',
+      credentials: 'include',
+      body: { questions: result.questions }
+    })
+    importSuccess.value = t('bank.import.success', { n: res.data.imported })
+    resetImportState()
+    await loadQuestions()
+    await loadBank()
+  } catch (err: any) {
+    importError.value = apiError(err, 'bank.import.requestFailed')
+  } finally {
+    importing.value = false
+  }
 }
 
 function addOption() {
@@ -384,9 +486,10 @@ onMounted(async () => {
             <div class="type-switch" role="tablist" :aria-label="t('question.typesAria')">
               <button type="button" :class="{ active: qType === 'choice' }" @click="switchType('choice')">{{ t('bank.add.typeChoice') }}</button>
               <button type="button" :class="{ active: qType === 'true_false' }" @click="switchType('true_false')">{{ t('bank.add.typeTf') }}</button>
+              <button type="button" :class="{ active: qType === 'import' }" @click="switchType('import')">{{ t('bank.import.tab') }}</button>
             </div>
 
-            <form @submit.prevent="submitQuestion">
+            <form v-if="qType !== 'import'" @submit.prevent="submitQuestion">
               <label class="field">
                 {{ t('bank.add.stem') }}
                 <textarea v-model="stem" rows="3" maxlength="2000" required :placeholder="t('bank.add.stemPlaceholder')" />
@@ -442,6 +545,45 @@ onMounted(async () => {
                 {{ saving ? t('bank.add.saving') : t('bank.add.submit') }}
               </button>
             </form>
+
+            <div v-else class="import-pane">
+              <p class="hint">{{ t('bank.import.hint') }}</p>
+              <div class="import-actions">
+                <button type="button" class="btn btn-secondary" @click="downloadTemplate">{{ t('bank.import.template') }}</button>
+                <button type="button" class="btn btn-primary" @click="importFileInput?.click()">{{ t('bank.import.chooseFile') }}</button>
+                <input ref="importFileInput" type="file" accept=".xlsx,.xls,.csv" class="import-file-input" @change="onImportFile" />
+              </div>
+              <p v-if="importFileName" class="import-file-name">{{ importFileName }}</p>
+              <p v-if="importTooMany" class="error">{{ t('bank.import.tooMany', { n: importResult?.totalRows ?? 0 }) }}</p>
+              <p v-else-if="importError" class="error">{{ importError }}</p>
+
+              <template v-if="importResult && importResult.totalRows > 0 && !importTooMany">
+                <p class="success">{{ t('bank.import.parsed', importSummary) }}</p>
+                <ul v-if="importResult.errors.length" class="import-errors">
+                  <li v-for="err in importResult.errors" :key="`${err.row}-${err.code}`" class="error">
+                    {{ t('bank.import.rowError', { row: err.row, reason: t(importErrorCodeMap[err.code]) }) }}
+                  </li>
+                </ul>
+                <template v-else>
+                  <ul class="q-list import-preview">
+                    <li v-for="(q, i) in importResult.questions" :key="i" class="q-item">
+                      <div class="q-main">
+                        <div class="q-top">
+                          <span class="q-index">{{ i + 1 }}</span>
+                          <span class="q-type">{{ typeLabel(q.type) }}</span>
+                        </div>
+                        <p class="q-stem">{{ q.stem }}</p>
+                        <p class="q-answer">{{ t('question.answerPrefix') }}{{ importAnswerText(q) }}</p>
+                      </div>
+                    </li>
+                  </ul>
+                  <button type="button" class="btn btn-primary btn-block" :disabled="!canImport || importing" @click="submitImport">
+                    {{ importing ? t('bank.import.importing') : t('bank.import.importBtn', { n: importResult.questions.length }) }}
+                  </button>
+                </template>
+              </template>
+              <p v-if="importSuccess" class="success">{{ importSuccess }}</p>
+            </div>
           </section>
 
           <section class="panel">
@@ -530,7 +672,7 @@ onMounted(async () => {
 form { display: grid; gap: 16px; }
 
 .type-switch {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px;
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; padding: 4px;
   background: var(--surface-2); border-radius: var(--radius-md); margin-bottom: 4px;
 }
 .type-switch button {
@@ -577,6 +719,15 @@ form { display: grid; gap: 16px; }
 .tf-row .answer-check { padding: 0 22px; }
 .choice-hint { margin: 2px 0 0; font-size: 12.5px; color: var(--muted-2); }
 .row-2 { display: grid; grid-template-columns: 1fr 1.4fr; gap: 14px; }
+
+.import-pane { display: grid; gap: 14px; }
+.import-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.import-file-input { display: none; }
+.import-file-name { margin: 0; font-size: 13px; color: var(--muted); font-family: var(--mono); }
+.import-errors { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.import-errors .error { margin: 0; font-size: 13.5px; }
+.import-preview { max-height: 420px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 4px 12px; }
+.import-pane .btn-block { margin-top: 2px; }
 
 .q-list { list-style: none; margin: 0; padding: 0; }
 .q-item {
