@@ -131,15 +131,15 @@ const zhCN = {
     logout: '退出登录',
     oauth: {
       divider: '或',
-      button: '使用工具箱账号登录',
+      button: '使用一方工具箱账号登录',
       errors: {
-        access_denied: '你取消了工具箱授权，未完成登录。',
+        access_denied: '你取消了一方工具箱授权，未完成登录。',
         invalid_state: '登录状态校验失败，请重新发起登录。',
-        token_exchange: '工具箱授权失败，请稍后重试。',
-        userinfo_failed: '获取工具箱用户信息失败，请稍后重试。',
+        token_exchange: '一方工具箱授权失败，请稍后重试。',
+        userinfo_failed: '获取一方工具箱用户信息失败，请稍后重试。',
         account_disabled: '该账号已被禁用，无法登录。',
-        not_configured: '工具箱登录暂未配置，请联系管理员。',
-        failed: '工具箱登录失败，请稍后重试。'
+        not_configured: '一方工具箱登录暂未配置，请联系管理员。',
+        failed: '一方工具箱登录失败，请稍后重试。'
       }
     }
   },
@@ -469,15 +469,15 @@ const enUS: MessageSchema = {
     logout: 'Log out',
     oauth: {
       divider: 'or',
-      button: 'Continue with your Toolbox account',
+      button: 'Continue with your Yifang Toolbox account',
       errors: {
-        access_denied: 'You cancelled the Toolbox authorization, so the login was not completed.',
+        access_denied: 'You cancelled the Yifang Toolbox authorization, so the login was not completed.',
         invalid_state: 'Login state verification failed. Please start the login again.',
-        token_exchange: 'Toolbox authorization failed. Please try again later.',
-        userinfo_failed: 'Failed to load your Toolbox profile. Please try again later.',
+        token_exchange: 'Yifang Toolbox authorization failed. Please try again later.',
+        userinfo_failed: 'Failed to load your Yifang Toolbox profile. Please try again later.',
         account_disabled: 'This account has been disabled and cannot log in.',
-        not_configured: 'Toolbox login is not configured yet. Please contact the administrator.',
-        failed: 'Toolbox login failed. Please try again later.'
+        not_configured: 'Yifang Toolbox login is not configured yet. Please contact the administrator.',
+        failed: 'Yifang Toolbox login failed. Please try again later.'
       }
     }
   },

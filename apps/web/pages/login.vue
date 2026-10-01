@@ -29,7 +29,7 @@ const oauthStartUrl = computed(() => `${config.public.apiBase}/auth/oauth/start?
 onMounted(() => {
   $fetch<{ data: { enabled: boolean } }>(`${config.public.apiBase}/auth/oauth/status`)
     .then((res) => { oauthEnabled.value = !!res.data?.enabled })
-    .catch(() => { /* 拉取失败时隐藏工具箱入口 */ })
+    .catch(() => { /* 拉取失败时隐藏一方工具箱入口 */ })
 })
 
 async function submit() {
@@ -102,7 +102,10 @@ function switchMode(next: 'login' | 'register') {
 
         <template v-if="oauthEnabled">
           <div class="oauth-divider"><span>{{ t('login.oauth.divider') }}</span></div>
-          <a class="btn btn-secondary btn-block" :href="oauthStartUrl">{{ t('login.oauth.button') }}</a>
+          <a class="btn btn-secondary btn-block oauth-btn" :href="oauthStartUrl">
+            <img src="/toolbox-logo.ico" alt="" aria-hidden="true" class="oauth-logo" />
+            {{ t('login.oauth.button') }}
+          </a>
         </template>
       </template>
     </div>
@@ -140,6 +143,8 @@ form { display: grid; gap: 16px; margin-top: 4px; }
 .btn-block { margin-top: 6px; }
 .btn-block + .btn-block { margin-top: 10px; }
 .oauth-error { margin: 0 0 14px; }
+.oauth-btn { gap: 9px; }
+.oauth-logo { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
 .oauth-divider { display: flex; align-items: center; gap: 12px; margin: 18px 0 4px; color: var(--muted); font-size: 13px; }
 .oauth-divider::before, .oauth-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .logged-hint { margin: 4px 0 22px; font-size: 15px; line-height: 1.7; color: var(--ink); }

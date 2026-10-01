@@ -94,7 +94,7 @@ const OAUTH_STATE_COOKIE = 'tiji_oauth_state'
 const OAUTH_STATE_SECONDS = 600
 type OAuthConfig = { providerUrl: string; clientId: string; clientSecret: string }
 
-// client_id/client_secret 配齐才启用工具箱登录；secret 用 `wrangler secret put OAUTH_CLIENT_SECRET` 下发
+// client_id/client_secret 配齐才启用一方工具箱登录；secret 用 `wrangler secret put OAUTH_CLIENT_SECRET` 下发
 const oauthConfig = (c: any): OAuthConfig | null =>
   c.env?.OAUTH_CLIENT_ID && c.env?.OAUTH_CLIENT_SECRET
     ? { providerUrl: String(c.env.OAUTH_PROVIDER_URL || 'https://tool.fologde.com').replace(/\/+$/, ''), clientId: String(c.env.OAUTH_CLIENT_ID), clientSecret: String(c.env.OAUTH_CLIENT_SECRET) }
