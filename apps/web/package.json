@@ -8,7 +8,7 @@
     "build": "nuxt build --dotenv .env.production",
     "generate": "nuxt generate --dotenv .env.production",
     "check": "nuxt typecheck",
-    "test": "node --test --experimental-strip-types"
+    "test": "node --test --experimental-strip-types \"test/*.test.mjs\""
   },
   "dependencies": {
     "@tiji/i18n": "workspace:*",
